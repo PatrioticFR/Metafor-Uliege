@@ -4,6 +4,7 @@ import os
 import shutil
 import time
 from datetime import datetime
+from wrap import *
 
 
 class SimulationManager:
@@ -11,8 +12,8 @@ class SimulationManager:
 
     def __init__(self, base_output_dir=None):
         # Paths based on your system
-        self.script_path = r"C:\Users\adpie\Desktop\Stage 4A\Metafor\muVINSv1_withTv11.py"
-        self.base_workspace = r"C:\Users\adpie\Desktop\Stage 4A\Metafor\workspace\muVINSv1_withTv11"
+        self.script_path = r"C:\Users\adpie\Desktop\Stage 4A\Metafor\muVINSv1_withTv12.py"
+        self.base_workspace = r"C:\Users\adpie\Desktop\Stage 4A\Metafor\workspace\muVINSv1_withTv12"
 
         # Results storage
         if base_output_dir is None:
@@ -30,6 +31,7 @@ class SimulationManager:
         self.simulation_results = {}
         self.current_config_index = 0
         self.configurations = []
+        self.simulation_active = False
 
         self.log_message("=== AUTOMATED SEQUENTIAL SIMULATION SYSTEM INITIALIZED ===")
         self.log_message(f"Results directory: {self.results_dir}")
@@ -58,9 +60,9 @@ class SimulationManager:
                 'blade_material': 'BE_CU',
                 'blade_thickness': 0.24,
                 'blade_length': 105.25,
-                'blade_width':45.0,
+                'blade_width': 45.0,
                 'enable_thermal': True,
-                'final_time': 35.0,
+                'final_time': 3.0,
                 'loading_time': 10.0
             }
         }
@@ -73,9 +75,9 @@ class SimulationManager:
                 'blade_material': 'BE_CU',
                 'blade_thickness': 0.24,
                 'blade_length': 105.25,
-                'blade_width':45.0,
+                'blade_width': 45.0,
                 'enable_thermal': False,
-                'final_time': 35.0,
+                'final_time': 3.0,
                 'loading_time': 10.0
             }
         }
@@ -89,7 +91,7 @@ class SimulationManager:
         return configurations
 
     def get_current_simulation_config(self):
-        """Get the current simulation configuration - called by getMetafor"""
+        """Get the current simulation configuration"""
         if hasattr(self, '_current_override_params'):
             return self._current_override_params
         return {}
@@ -127,12 +129,6 @@ class SimulationManager:
             shutil.copytree(self.base_workspace, backup_dir)
             self.log_message(f"Workspace backed up to: {backup_dir}")
 
-            # Also copy the resFiles.txt if it exists (Metafor output log)
-            res_file = os.path.join(self.base_workspace, "resFiles.txt")
-            if os.path.exists(res_file):
-                shutil.copy2(res_file, os.path.join(backup_dir, "resFiles.txt"))
-                self.log_message("Metafor output log (resFiles.txt) backed up")
-
             return backup_dir
 
         except Exception as e:
@@ -143,163 +139,31 @@ class SimulationManager:
         """Clean workspace for next simulation while preserving essential files"""
         try:
             if os.path.exists(self.base_workspace):
-                # Keep pars.py but remove result files
+                # Remove result files but keep configuration files
                 for filename in os.listdir(self.base_workspace):
                     filepath = os.path.join(self.base_workspace, filename)
                     if filename.endswith('.v') or filename.endswith('.ascii') or filename == 'resFiles.txt':
                         if os.path.isfile(filepath):
                             os.remove(filepath)
+                            self.log_message(f"Removed: {filename}")
 
                 self.log_message("Workspace cleaned for next simulation")
 
         except Exception as e:
             self.log_message(f"Warning: Could not clean workspace: {e}")
 
-    def analyze_simulation_results(self, config_name, backup_dir, config):
-        """Analyze results from a completed simulation"""
-        self.log_message(f"\n=== ANALYZING RESULTS FOR {config_name} ===")
-
-        results = {
-            'config_name': config_name,
-            'backup_dir': backup_dir,
-            'config': config,
-            'files_found': [],
-            'key_results': {}
-        }
-
-        if not backup_dir or not os.path.exists(backup_dir):
-            self.log_message("No backup directory found - cannot analyze results")
-            return results
-
-        # Expected result files
-        expected_files = [
-            'time.ascii',
-            'displacement_rod_end_Y.ascii',
-            'Max_VonMises_BeCu.ascii',
-            'dispY_Bottom_right_mass.ascii',
-            'forceYExtClampinPt.ascii'
-        ]
-
-        # Thermal-specific files
-        if config['parameters'].get('enable_thermal', False):
-            expected_files.extend([
-                'temp_mean_blade_K.ascii',
-                'thermal_strain_max_blade.ascii',
-                'thermal_dispX_mass_top_right.ascii',
-                'thermal_dispY_mass_top_right.ascii'
-            ])
-
-        # Check which files exist and extract key values
-        for filename in expected_files:
-            filepath = os.path.join(backup_dir, filename)
-            if os.path.exists(filepath):
-                results['files_found'].append(filename)
-                try:
-                    with open(filepath, 'r') as f:
-                        values = [float(line.strip()) for line in f if line.strip()]
-
-                    if values:
-                        if 'time' in filename:
-                            results['key_results']['simulation_time'] = values[-1]
-                            results['key_results']['time_steps'] = len(values)
-                        elif 'displacement_rod_end_Y' in filename:
-                            results['key_results']['final_rod_displacement_Y'] = values[-1]
-                            results['key_results']['max_rod_displacement_Y'] = max(values)
-                        elif 'VonMises' in filename:
-                            results['key_results']['max_stress_MPa'] = max(values)
-                            results['key_results']['final_stress_MPa'] = values[-1]
-                        elif 'temp_mean' in filename:
-                            initial_temp_C = values[0] - 273.15
-                            final_temp_C = values[-1] - 273.15
-                            results['key_results']['initial_temp_C'] = initial_temp_C
-                            results['key_results']['final_temp_C'] = final_temp_C
-                            results['key_results']['temp_change_C'] = final_temp_C - initial_temp_C
-                        elif 'thermal_disp' in filename and 'mass' in filename:
-                            results['key_results']['thermal_mass_displacement'] = values[-1] - values[0]
-
-                except Exception as e:
-                    self.log_message(f"Could not analyze {filename}: {e}")
-
-        # Log key findings
-        self.log_message(f"Files found: {len(results['files_found'])}/{len(expected_files)}")
-        for key, value in results['key_results'].items():
-            if isinstance(value, float):
-                self.log_message(f"  {key}: {value:.6f}")
-            else:
-                self.log_message(f"  {key}: {value}")
-
-        # Store results
-        self.simulation_results[config_name] = results
-
-        return results
-
-    def generate_comparison_report(self):
-        """Generate a comprehensive comparison report of all simulations"""
-        self.log_message("\n" + "=" * 80)
-        self.log_message("COMPREHENSIVE SIMULATION COMPARISON REPORT")
-        self.log_message("=" * 80)
-
-        report_file = os.path.join(self.results_dir, "comparison_report.txt")
-
-        with open(report_file, 'w', encoding='utf-8') as f:
-            f.write("AUTOMATED SIMULATION COMPARISON REPORT\n")
-            f.write("=" * 80 + "\n")
-            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"Total simulations: {len(self.simulation_results)}\n\n")
-
-            # Summary table
-            f.write("SIMULATION SUMMARY TABLE\n")
-            f.write("-" * 80 + "\n")
-            f.write(f"{'Config Name':<25} {'Material':<8} {'Thermal':<8} {'Max Stress':<12} {'Rod Disp Y':<12}\n")
-            f.write("-" * 80 + "\n")
-
-            for config_name, results in self.simulation_results.items():
-                material = results['config']['parameters'].get('blade_material', 'N/A')
-                thermal = 'Yes' if results['config']['parameters'].get('enable_thermal', False) else 'No'
-                max_stress = results['key_results'].get('max_stress_MPa', 0)
-                rod_disp = results['key_results'].get('final_rod_displacement_Y', 0)
-
-                f.write(f"{config_name:<25} {material:<8} {thermal:<8} {max_stress:<12.2f} {rod_disp:<12.6f}\n")
-
-            f.write("\n" + "=" * 80 + "\n")
-
-            # Detailed results for each simulation
-            for config_name, results in self.simulation_results.items():
-                f.write(f"\nDETAILED RESULTS: {config_name}\n")
-                f.write("-" * 50 + "\n")
-                f.write(f"Description: {results['config']['description']}\n")
-                f.write(f"Backup directory: {results['backup_dir']}\n")
-                f.write(f"Files generated: {len(results['files_found'])}\n")
-
-                f.write("\nConfiguration parameters:\n")
-                for param, value in results['config']['parameters'].items():
-                    f.write(f"  {param}: {value}\n")
-
-                f.write("\nKey results:\n")
-                for key, value in results['key_results'].items():
-                    if isinstance(value, float):
-                        f.write(f"  {key}: {value:.6f}\n")
-                    else:
-                        f.write(f"  {key}: {value}\n")
-
-                f.write("\n")
-
-        self.log_message(f"Comparison report saved to: {report_file}")
-        return report_file
-
-    def should_continue_to_next_simulation(self):
-        """Check if we should continue to the next simulation"""
+    def has_next_simulation(self):
+        """Check if there are more simulations to run"""
         return self.current_config_index + 1 < len(self.configurations)
 
     def advance_to_next_simulation(self):
         """Advance to the next simulation configuration"""
         current_config = self.configurations[self.current_config_index]
 
+        self.log_message(f"=== SIMULATION {self.current_config_index + 1} COMPLETED ===")
+
         # Backup current results
         backup_dir = self.backup_current_workspace(current_config['name'])
-
-        # Analyze results
-        self.analyze_simulation_results(current_config['name'], backup_dir, current_config)
 
         # Clean workspace for next simulation
         self.clean_workspace_for_next_simulation()
@@ -307,14 +171,30 @@ class SimulationManager:
         # Move to next configuration
         self.current_config_index += 1
 
-        if self.should_continue_to_next_simulation():
+        if self.has_next_simulation():
+            # Set up next simulation
             self.set_current_simulation(self.current_config_index)
+            self.simulation_active = False  # Reset for next simulation
             return True
         else:
             # All simulations completed
             self.log_message("\n=== ALL SIMULATIONS COMPLETED ===")
             self.generate_comparison_report()
             return False
+
+    def generate_comparison_report(self):
+        """Generate a simple completion report"""
+        self.log_message("\n" + "=" * 80)
+        self.log_message("SIMULATION SEQUENCE COMPLETED")
+        self.log_message("=" * 80)
+        self.log_message(f"Total simulations run: {len(self.configurations)}")
+
+        for i, config in enumerate(self.configurations):
+            backup_dir = os.path.join(self.results_dir, config['name'])
+            exists = "✓" if os.path.exists(backup_dir) else "✗"
+            self.log_message(f"  {i + 1}. {config['name']}: {exists}")
+
+        self.log_message("Check individual directories for detailed results.")
 
     def run_all_simulations(self):
         """Initialize the sequential simulation process"""
@@ -330,7 +210,6 @@ class SimulationManager:
         if success:
             self.log_message("Sequential simulation system initialized.")
             self.log_message("Metafor will now run the first simulation.")
-            self.log_message("The system will automatically handle subsequent simulations.")
 
         return success
 
@@ -348,10 +227,39 @@ def get_simulation_manager():
     return _simulation_manager
 
 
-def handle_simulation_completion():
-    """Handle completion of current simulation and advance to next"""
-    manager = get_simulation_manager()
-    return manager.advance_to_next_simulation()
+# CORRECTED OBSERVER CLASS
+class SequentialSimulationObserver(MetaforObserver):
+    """Observer to handle automatic simulation chaining"""
+
+    def __init__(self):
+        MetaforObserver.__init__(self)
+        self.manager = get_simulation_manager()
+
+    def simulationCompleted(self, metafor):
+        """Called when a simulation completes successfully"""
+        self.manager.log_message(">>> Simulation completed. Processing next simulation...")
+
+        # Mark current simulation as completed and try to advance
+        if self.manager.advance_to_next_simulation():
+            self.manager.log_message(">>> Preparing next simulation...")
+
+            # Important: We need to restart Metafor for the next simulation
+            # This is the critical part that was missing
+            try:
+                # Reset Metafor state
+                metafor.reset()
+
+                # Reload with new configuration
+                new_metafor = getMetafor()
+
+                # Start the new simulation
+                self.manager.log_message(">>> Starting next simulation...")
+                new_metafor.start()
+
+            except Exception as e:
+                self.manager.log_message(f"Error starting next simulation: {e}")
+        else:
+            self.manager.log_message(">>> All simulations completed!")
 
 
 # =============================================================================
@@ -552,6 +460,13 @@ class SimulationConfig:
         self.temp_final_kelvin = 273.15 + 50.0
         self.temp_start_time = 20.0
         self.temp_end_time = 35.0
+
+        # Time step control - NEW FEATURE
+        self.adaptive_timestep = False  # Set to True for adaptive, False for fixed
+
+        # Fixed time step parameters (used when adaptive_timestep = False)
+        self.fixed_timestep_size = 0.02  # Fixed time step size
+        self.fixed_initial_timestep = 0.01  # Initial time step for fixed mode
 
         # Optimized clamping parameters
         self.Dx, self.Dy = blade_config.get_compensated_clamping_position()
@@ -1156,40 +1071,49 @@ def getMetafor(d={}):
         ti = AlphaGeneralizedTimeIntegration(metafor)
         metafor.setTimeIntegration(ti)
 
-    # TIME STEP MANAGEMENT - CRITICAL FOR PERFORMANCE - REFINED
+    # TIME STEP MANAGEMENT - ADAPTIVE OR FIXED
     tsm = metafor.getTimeStepManager()
-    tsm.setInitialTime(0.0, 0.01)  # Smaller initial step for better convergence
 
-    # ADAPTIVE TIME STEPPING based on simulation phases - ENHANCED
-    if sim_config.enable_thermal:
-        # Phase 1: Mechanical loading (0 to T_load) - progressive refinement
-        tsm.setNextTime(sim_config.loading_time * 0.25, 12, 0.01)  # Early loading Up to 2.5s
-        tsm.setNextTime(sim_config.loading_time * 0.5, 12, 0.005)  # Mid loading Up to 5s
-        tsm.setNextTime(sim_config.loading_time * 0.75, 25, 0.005)  # Late loading Up to 7.5s
-        tsm.setNextTime(sim_config.loading_time, 25, 0.005)  # Final mechanical phase Up to 10s
+    if sim_config.adaptive_timestep:
+        print("INFO: Using ADAPTIVE time stepping.")
+        tsm.setInitialTime(0.0, 0.01)  # Smaller initial step for better convergence
 
-        # Phase 2: Stabilization (T_load to temp_start_time) - MUCH SMALLER STEPS
-        # This phase is critical for convergence
-        tsm.setNextTime(sim_config.loading_time + 1.0, 10, 0.01)  # First second after loading Up to 11s
-        tsm.setNextTime(sim_config.loading_time + 2.5, 15, 0.02)  # Intermediate stabilization Up to 12.5s
-        tsm.setNextTime(sim_config.temp_start_time - 2.0, 11, 0.05)  # Pre-thermal Up to 18s
-        tsm.setNextTime(sim_config.temp_start_time, 4, 0.05)  # Just before thermal Up to 20s
+        # ADAPTIVE TIME STEPPING based on simulation phases - ENHANCED
+        if sim_config.enable_thermal:
+            # Phase 1: Mechanical loading (0 to T_load) - progressive refinement
+            tsm.setNextTime(sim_config.loading_time * 0.25, 12, 0.01)  # Early loading Up to 2.5s
+            tsm.setNextTime(sim_config.loading_time * 0.5, 12, 0.005)  # Mid loading Up to 5s
+            tsm.setNextTime(sim_config.loading_time * 0.75, 25, 0.005)  # Late loading Up to 7.5s
+            tsm.setNextTime(sim_config.loading_time, 25, 0.005)  # Final mechanical phase Up to 10s
 
-        # Phase 3: Thermal loading (temp_start_time to temp_end_time) - adaptive steps
-        thermal_duration = sim_config.temp_end_time - sim_config.temp_start_time
-        tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.1, 3, 0.05)  # Thermal start Up to 21.5s
-        tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.5, 12, 0.05)  # Mid thermal Up to 27.5s
-        tsm.setNextTime(sim_config.temp_end_time, 37, 0.02)  # End thermal - finest steps Up to 35s
+            # Phase 2: Stabilization (T_load to temp_start_time) - MUCH SMALLER STEPS
+            tsm.setNextTime(sim_config.loading_time + 1.0, 10, 0.01)  # First second after loading Up to 11s
+            tsm.setNextTime(sim_config.loading_time + 2.5, 15, 0.02)  # Intermediate stabilization Up to 12.5s
+            tsm.setNextTime(sim_config.temp_start_time - 2.0, 11, 0.05)  # Pre-thermal Up to 18s
+            tsm.setNextTime(sim_config.temp_start_time, 4, 0.05)  # Just before thermal Up to 20s
 
-        # Phase 4: Final phase - can use larger steps again
-        if sim_config.temp_end_time < sim_config.final_time:
-            tsm.setNextTime(sim_config.final_time, 5, 0.1)
+            # Phase 3: Thermal loading (temp_start_time to temp_end_time) - adaptive steps
+            thermal_duration = sim_config.temp_end_time - sim_config.temp_start_time
+            tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.1, 3, 0.05)  # Thermal start Up to 21.5s
+            tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.5, 12, 0.05)  # Mid thermal Up to 27.5s
+            tsm.setNextTime(sim_config.temp_end_time, 37, 0.02)  # End thermal - finest steps Up to 35s
+
+            # Phase 4: Final phase - can use larger steps again
+            if sim_config.temp_end_time < sim_config.final_time:
+                tsm.setNextTime(sim_config.final_time, 5, 0.1)
+
+        else:
+            # Pure mechanical - simpler time stepping
+            tsm.setNextTime(sim_config.loading_time * 0.5, 25, 0.01)
+            tsm.setNextTime(sim_config.loading_time, 50, 0.005)
+            tsm.setNextTime(sim_config.final_time, 40, 0.05)
 
     else:
-        # Pure mechanical - simpler time stepping
-        tsm.setNextTime(T_load * 0.5, 25, 0.01)
-        tsm.setNextTime(T_load, 50, 0.005)
-        tsm.setNextTime(T, 40, 0.05)
+        print(f"INFO: Using FIXED time stepping with dt = {sim_config.fixed_timestep_size}.")
+        tsm.setInitialTime(0.0, sim_config.fixed_initial_timestep)
+
+        # Single fixed time step for entire simulation
+        tsm.setNextTime(sim_config.final_time, 20, sim_config.fixed_timestep_size)
 
     # TOLERANCE MANAGEMENT - ADAPTIVE for different phases
     fct_TOL = PieceWiseLinearFunction()
@@ -1435,11 +1359,15 @@ def getMetafor(d={}):
             print("Warning: Visualization not available")
             pass
 
-    # At the end of successful simulation, handle completion
-    # This should be called after the time integration completes
-    # You might need to add this in a callback or at the end of your simulation
+    # CRITICAL: Add the observer to handle automatic chaining
+    if not manager.simulation_active:
+        observer = SequentialSimulationObserver()
+        metafor.addObserver(observer)
+        manager.simulation_active = True
+        manager.log_message("Sequential simulation observer attached.")
 
     return metafor  # Your existing return
+
 
 
 # Modified postpro function to handle sequential processing

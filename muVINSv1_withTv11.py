@@ -39,9 +39,9 @@ class BladeConfig:
         self.width_ref = 45.0  # reference width
 
         # Current blade geometry
-        self.thickness = 0.29  # current thickness (e/h)
-        self.length = 105.25  # current length (L)
-        self.width = 25.2  # current width
+        self.thickness = 0.24  # current thickness (e/h)
+        self.length = 93.1  # current length (L)
+        self.width = 40.8  # current width
 
         # Material selection: 'BE_CU', 'INVAR', 'STEEL'
         self.material = 'BE_CU'
@@ -53,7 +53,7 @@ class BladeConfig:
         # Reference equilibrium parameters
         self.enc_ref = 57.32
 
-        self.Dx_fixe = True  #Set to True for Dx = -67.5227 (experimental value) and False for Dx to be calculated
+        self.Dx_fixe = False  #Set to True for Dx = -67.5227 (experimental value) and False for Dx to be calculated
 
     def get_elements_length(self):
         return int(self.length * self.elements_length_factor)
@@ -206,11 +206,18 @@ class SimulationConfig:
         self.stabilization_time = 12.0
 
         # Temperature parameters
-        self.enable_thermal = True
+        self.enable_thermal = False
         self.temp_initial_kelvin = 273.15 + 10.0
         self.temp_final_kelvin = 273.15 + 50.0
         self.temp_start_time = 20.0
         self.temp_end_time = 35.0
+
+        # Time step control
+        self.adaptive_timestep = True  # Set to True for adaptive, False for fixed
+
+        # Fixed time step parameters (used when adaptive_timestep = False)
+        self.fixed_timestep_size = 0.02  # Fixed time step size
+        self.fixed_initial_timestep = 0.01  # Initial time step for fixed mode
 
         # Optimized clamping parameters
         self.Dx, self.Dy = blade_config.get_compensated_clamping_position()
@@ -810,40 +817,49 @@ def getMetafor(d={}):
         ti = AlphaGeneralizedTimeIntegration(metafor)
         metafor.setTimeIntegration(ti)
 
-    # TIME STEP MANAGEMENT - CRITICAL FOR PERFORMANCE - REFINED
+    # TIME STEP MANAGEMENT - ADAPTIVE OR FIXED
     tsm = metafor.getTimeStepManager()
-    tsm.setInitialTime(0.0, 0.01)  # Smaller initial step for better convergence
 
-    # ADAPTIVE TIME STEPPING based on simulation phases - ENHANCED
-    if sim_config.enable_thermal:
-        # Phase 1: Mechanical loading (0 to T_load) - progressive refinement
-        tsm.setNextTime(sim_config.loading_time * 0.25, 12, 0.01)  # Early loading Up to 2.5s
-        tsm.setNextTime(sim_config.loading_time * 0.5, 12, 0.005)  # Mid loading Up to 5s
-        tsm.setNextTime(sim_config.loading_time * 0.75, 25, 0.005)  # Late loading Up to 7.5s
-        tsm.setNextTime(sim_config.loading_time, 25, 0.005)  # Final mechanical phase Up to 10s
+    if sim_config.adaptive_timestep:
+        print("INFO: Using ADAPTIVE time stepping.")
+        tsm.setInitialTime(0.0, 0.01)  # Smaller initial step for better convergence
 
-        # Phase 2: Stabilization (T_load to temp_start_time) - MUCH SMALLER STEPS
-        # This phase is critical for convergence
-        tsm.setNextTime(sim_config.loading_time + 1.0, 10, 0.01)  # First second after loading Up to 11s
-        tsm.setNextTime(sim_config.loading_time + 2.5, 15, 0.02)  # Intermediate stabilization Up to 12.5s
-        tsm.setNextTime(sim_config.temp_start_time - 2.0, 11, 0.05)  # Pre-thermal Up to 18s
-        tsm.setNextTime(sim_config.temp_start_time, 4, 0.05)  # Just before thermal Up to 20s
+        # ADAPTIVE TIME STEPPING based on simulation phases - ENHANCED
+        if sim_config.enable_thermal:
+            # Phase 1: Mechanical loading (0 to T_load) - progressive refinement
+            tsm.setNextTime(sim_config.loading_time * 0.25, 12, 0.01)  # Early loading Up to 2.5s
+            tsm.setNextTime(sim_config.loading_time * 0.5, 12, 0.005)  # Mid loading Up to 5s
+            tsm.setNextTime(sim_config.loading_time * 0.75, 25, 0.005)  # Late loading Up to 7.5s
+            tsm.setNextTime(sim_config.loading_time, 25, 0.005)  # Final mechanical phase Up to 10s
 
-        # Phase 3: Thermal loading (temp_start_time to temp_end_time) - adaptive steps
-        thermal_duration = sim_config.temp_end_time - sim_config.temp_start_time
-        tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.1, 3, 0.05)  # Thermal start Up to 21.5s
-        tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.5, 12, 0.05)  # Mid thermal Up to 27.5s
-        tsm.setNextTime(sim_config.temp_end_time, 37, 0.02)  # End thermal - finest steps Up to 35s
+            # Phase 2: Stabilization (T_load to temp_start_time) - MUCH SMALLER STEPS
+            tsm.setNextTime(sim_config.loading_time + 1.0, 10, 0.01)  # First second after loading Up to 11s
+            tsm.setNextTime(sim_config.loading_time + 2.5, 15, 0.02)  # Intermediate stabilization Up to 12.5s
+            tsm.setNextTime(sim_config.temp_start_time - 2.0, 11, 0.05)  # Pre-thermal Up to 18s
+            tsm.setNextTime(sim_config.temp_start_time, 4, 0.05)  # Just before thermal Up to 20s
 
-        # Phase 4: Final phase - can use larger steps again
-        if sim_config.temp_end_time < sim_config.final_time:
-            tsm.setNextTime(sim_config.final_time, 5, 0.1)
+            # Phase 3: Thermal loading (temp_start_time to temp_end_time) - adaptive steps
+            thermal_duration = sim_config.temp_end_time - sim_config.temp_start_time
+            tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.1, 3, 0.05)  # Thermal start Up to 21.5s
+            tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.5, 12, 0.05)  # Mid thermal Up to 27.5s
+            tsm.setNextTime(sim_config.temp_end_time, 37, 0.02)  # End thermal - finest steps Up to 35s
+
+            # Phase 4: Final phase - can use larger steps again
+            if sim_config.temp_end_time < sim_config.final_time:
+                tsm.setNextTime(sim_config.final_time, 5, 0.1)
+
+        else:
+            # Pure mechanical - simpler time stepping
+            tsm.setNextTime(sim_config.loading_time * 0.5, 25, 0.01)
+            tsm.setNextTime(sim_config.loading_time, 50, 0.005)
+            tsm.setNextTime(sim_config.final_time, 40, 0.05)
 
     else:
-        # Pure mechanical - simpler time stepping
-        tsm.setNextTime(T_load * 0.5, 25, 0.01)
-        tsm.setNextTime(T_load, 50, 0.005)
-        tsm.setNextTime(T, 40, 0.05)
+        print(f"INFO: Using FIXED time stepping with dt = {sim_config.fixed_timestep_size}.")
+        tsm.setInitialTime(0.0, sim_config.fixed_initial_timestep)
+
+        # Single fixed time step for entire simulation
+        tsm.setNextTime(sim_config.final_time, 20, sim_config.fixed_timestep_size)
 
     # TOLERANCE MANAGEMENT - ADAPTIVE for different phases
     fct_TOL = PieceWiseLinearFunction()

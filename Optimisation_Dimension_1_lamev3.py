@@ -53,8 +53,11 @@ class ModularBladeConfig:
             self.L_range = np.sort(self.L_range)
 
         # Ratio k idéal (basé sur la référence BE_CU)
-        self.k_ratio_min = 0.987
-        self.k_ratio_max = 0.990
+        # self.k_ratio_min = 0.987
+        # self.k_ratio_max = 0.990
+        self.k_ratio_min = 1.015
+        self.k_ratio_max = 1.025
+
 
         # Référence k (calculée avec BE_CU par défaut)
         self.k_ref = self.calculate_k_reference_material('BE_CU')
@@ -97,18 +100,22 @@ class ModularBladeConfig:
     def estimate_stabilization_position(self, k_value: float) -> float:
         """
         Estimation de la position de stabilisation basée sur k
-        Points de référence connus :
-        - k_ratio = 1.0 → stabilisation ≈ 0.9mm (référence originale)
+        Points de référence mis à jour :
+        - k_ratio = 1.0 → stabilisation ≈ -0.2mm (référence avec Dx parfait -67.0 au lieu de -67.7)
         - k_ratio = 0.9921 → stabilisation ≈ 0.62mm (Be-Cu 105.25, 0.25, 39.5)
         """
         k_ratio = k_value / self.k_ref
 
-        # Points de référence pour l'interpolation
+        # Points de référence pour l'interpolation (corrigés)
         k_ratio_ref1 = 1.0  # référence originale
-        stabilization_ref1 = 0.9  # mm
+        stabilization_ref1 = -0.25  # mm (nouveau point de stabilisation pour un dx parfait)
 
-        k_ratio_ref2 = 0.9921  # nouvelle référence Be-Cu
-        stabilization_ref2 = 0.62  # mm
+        # k_ratio_ref2 = 0.9921  # Pour dx fixe
+        # stabilization_ref2 = 0.62  # mm
+
+        k_ratio_ref2 = 1.013  # Pour dx parfait
+        stabilization_ref2 = 0.17  # mm
+
 
         if k_ratio >= k_ratio_ref1:
             # Pour k_ratio >= 1.0, extrapolation linéaire
