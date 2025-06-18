@@ -3,142 +3,168 @@ import numpy as np
 from enum import Enum
 from typing import List, Dict, Tuple
 
+MATERIAL_CONFIG = 'INVAR'  # Change this to 'INVAR' or 'STEEL' or 'BE_CU' as needed
+
 
 class ConfigurationType(Enum):
-    """Types de configurations possibles"""
+    """Types of possible configurations"""
     L_CONSTANT = "L_constant"
     H_CONSTANT = "h_constant"
     W_CONSTANT = "w_constant"
 
 
 class VariationMode(Enum):
-    """Modes de variation pour les paramètres"""
+    """Variation modes for parameters"""
     OPTIMAL = "optimal"
     HIGH_LOW = "high_low"
     LOW_HIGH = "low_high"
 
 
-def calculate_ideal_perf_ratio_range():
+def calculate_ideal_perf_ratio_range(material=MATERIAL_CONFIG):
     """
-    Calcule les valeurs idéales de perf_ratio_min et perf_ratio_max
-    basées sur les données de stabilisation observées
+    Calculate ideal values for perf_ratio_min and perf_ratio_max
+    based on observed stabilization data for specific material
     """
 
-    # Données observées
-    config1 = {
-        'L': 103.3,
-        'h': 0.24,
-        'w': 58.5,
-        'perf_ratio': 1.0451,
-        'stabilisation': 8.59333
+    # Material-specific observed data
+    material_configs = {
+        'BE_CU': {
+            'config1': {
+                'L': 93.1, 'h': 0.24, 'w': 40.8,
+                'perf_ratio': 1.025, 'stabilization': 0.571853
+            },
+            'config2': {
+                'L': 93.1, 'h': 0.24, 'w': 40.4,
+                'perf_ratio': 1.015, 'stabilization': 0.256159
+            }
+        },
+        'STEEL': {
+            # You need to provide experimental data for Steel here
+            'config1': {
+                'L': 93.1, 'h': 0.24, 'w': 40.8,
+                'perf_ratio': 1.020, 'stabilization': 0.500  # Example values - replace with real data if needed
+            },
+            'config2': {
+                'L': 93.1, 'h': 0.24, 'w': 40.4,
+                'perf_ratio': 1.010, 'stabilization': 0.300  # Example values - replace with real data if needed
+            }
+        },
+        'INVAR': {
+            'config1': {
+                'L': 105.25, 'h': 0.24, 'w': 45.0,
+                'perf_ratio': 1.0076, 'stabilization': -2.97027
+            },
+            'config2': {
+                'L': 105.25, 'h': 0.23, 'w': 52.4,
+                'perf_ratio': 1.0249, 'stabilization': -0.00145
+            }
+        }
     }
 
-    config2 = {
-        'L': 107.8,
-        'h': 0.24,
-        'w': 36.7,
-        'perf_ratio': 1.0348,
-        'stabilisation': -9.49018
-    }
+    if material not in material_configs:
+        print(f"Warning: No experimental data for material {material}, using {MATERIAL_CONFIG} data")
+        material = MATERIAL_CONFIG
 
-    # Objectifs de stabilisation
+    config1 = material_configs[material]['config1']
+    config2 = material_configs[material]['config2']
+
+    # Rest of the function remains the same...
     target_min = 0.5  # mm
     target_max = 1.0  # mm
 
-    print("=== CALCUL DES PERF_RATIO IDÉAUX ===")
+    print(f"=== CALCULATION OF IDEAL PERF_RATIO FOR {material} ===")
     print(f"Configuration 1: L={config1['L']}, h={config1['h']}, w={config1['w']}")
-    print(f"  perf_ratio = {config1['perf_ratio']:.4f} → stabilisation = {config1['stabilisation']:.3f} mm")
+    print(f"  perf_ratio = {config1['perf_ratio']:.4f} -> stabilization = {config1['stabilization']:.3f} mm")
     print(f"Configuration 2: L={config2['L']}, h={config2['h']}, w={config2['w']}")
-    print(f"  perf_ratio = {config2['perf_ratio']:.4f} → stabilisation = {config2['stabilisation']:.3f} mm")
+    print(f"  perf_ratio = {config2['perf_ratio']:.4f} -> stabilization = {config2['stabilization']:.3f} mm")
     print()
-    print(f"Objectif: stabilisation entre {target_min} et {target_max} mm")
+    print(f"Target: stabilization between {target_min} and {target_max} mm")
     print()
 
-    # Calcul par interpolation/extrapolation linéaire
-    # Relation: stabilisation = a * perf_ratio + b
+    # Calculation by linear interpolation/extrapolation
+    # Relation: stabilization = a * perf_ratio + b
 
-    # Calcul des coefficients de la droite
-    delta_stab = config1['stabilisation'] - config2['stabilisation']
+    # Calculate line coefficients
+    delta_stab = config1['stabilization'] - config2['stabilization']
     delta_perf = config1['perf_ratio'] - config2['perf_ratio']
 
-    # Pente de la droite
+    # Line slope
     a = delta_stab / delta_perf
 
-    # Ordonnée à l'origine
-    b = config1['stabilisation'] - a * config1['perf_ratio']
+    # Y-intercept
+    b = config1['stabilization'] - a * config1['perf_ratio']
 
-    print(f"Relation linéaire: stabilisation = {a:.2f} * perf_ratio + {b:.2f}")
+    print(f"Linear relation: stabilization = {a:.2f} * perf_ratio + {b:.2f}")
     print()
 
-    # Calcul des perf_ratio correspondant aux objectifs
+    # Calculate perf_ratio corresponding to targets
     # target = a * perf_ratio + b
     # perf_ratio = (target - b) / a
 
     perf_ratio_for_target_min = (target_min - b) / a
     perf_ratio_for_target_max = (target_max - b) / a
 
-    # Déterminer min et max (car la relation peut être décroissante)
+    # Determine min and max (as relation can be decreasing)
     perf_ratio_min = min(perf_ratio_for_target_min, perf_ratio_for_target_max)
     perf_ratio_max = max(perf_ratio_for_target_min, perf_ratio_for_target_max)
 
-    print("=== RÉSULTATS ===")
-    print(f"Pour une stabilisation de {target_min} mm: perf_ratio = {perf_ratio_for_target_min:.6f}")
-    print(f"Pour une stabilisation de {target_max} mm: perf_ratio = {perf_ratio_for_target_max:.6f}")
+    print("=== RESULTS ===")
+    print(f"For stabilization of {target_min} mm: perf_ratio = {perf_ratio_for_target_min:.6f}")
+    print(f"For stabilization of {target_max} mm: perf_ratio = {perf_ratio_for_target_max:.6f}")
     print()
-    print(f"VALEURS IDÉALES À UTILISER:")
+    print(f"IDEAL VALUES TO USE:")
     print(f"self.perf_ratio_min = {perf_ratio_min:.6f}")
     print(f"self.perf_ratio_max = {perf_ratio_max:.6f}")
     print()
 
-    # Vérification
-    print("=== VÉRIFICATION ===")
+    # Verification
+    print("=== VERIFICATION ===")
     stab_check_min = a * perf_ratio_min + b
     stab_check_max = a * perf_ratio_max + b
-    print(f"Avec perf_ratio = {perf_ratio_min:.6f} → stabilisation = {stab_check_min:.3f} mm")
-    print(f"Avec perf_ratio = {perf_ratio_max:.6f} → stabilisation = {stab_check_max:.3f} mm")
+    print(f"With perf_ratio = {perf_ratio_min:.6f} -> stabilization = {stab_check_min:.3f} mm")
+    print(f"With perf_ratio = {perf_ratio_max:.6f} -> stabilization = {stab_check_max:.3f} mm")
     print()
 
-    # Analyse de la tendance
+    # Trend analysis
     if a > 0:
-        print("📈 Tendance: Plus le perf_ratio augmente, plus la stabilisation augmente")
-        print(f"   perf_ratio_min ({perf_ratio_min:.6f}) → stabilisation vers {target_min} mm")
-        print(f"   perf_ratio_max ({perf_ratio_max:.6f}) → stabilisation vers {target_max} mm")
+        print("Trend: Higher perf_ratio increases stabilization")
+        print(f"   perf_ratio_min ({perf_ratio_min:.6f}) -> stabilization towards {target_min} mm")
+        print(f"   perf_ratio_max ({perf_ratio_max:.6f}) -> stabilization towards {target_max} mm")
     else:
-        print("📉 Tendance: Plus le perf_ratio augmente, plus la stabilisation diminue")
-        print(f"   perf_ratio_min ({perf_ratio_min:.6f}) → stabilisation vers {target_max} mm")
-        print(f"   perf_ratio_max ({perf_ratio_max:.6f}) → stabilisation vers {target_min} mm")
+        print("Trend: Higher perf_ratio decreases stabilization")
+        print(f"   perf_ratio_min ({perf_ratio_min:.6f}) -> stabilization towards {target_max} mm")
+        print(f"   perf_ratio_max ({perf_ratio_max:.6f}) -> stabilization towards {target_min} mm")
 
     return perf_ratio_min, perf_ratio_max
 
 
 class ModularBladeConfig:
-    """Configuration modulaire pour l'optimisation de lames avec effet bras de levier"""
+    """Modular configuration for blade optimization with lever arm effect"""
 
     perf_min, perf_max = calculate_ideal_perf_ratio_range()
 
-    def __init__(self, material: str = 'BE_CU', Dx_fixe: bool = False):
-        # Géométrie de référence
-        self.thickness_ref = 0.24  # h de référence
-        self.length_ref = 105.25  # L de référence
-        self.width_ref = 45.0  # w de référence
-        self.enc_ref = 57.32  # Position encodeur sur la masse
+    def __init__(self, material: str = MATERIAL_CONFIG, Dx_fixed: bool = False):
+        # Reference geometry
+        self.thickness_ref = 0.24  # h reference
+        self.length_ref = 105.25  # L reference
+        self.width_ref = 45.0  # w reference
+        self.enc_ref = 57.32  # Encoder position on mass
 
-        # Mode de calcul Dx
-        self.Dx_fixe = Dx_fixe
-        self.Dx_fixed_value = -67.5227  # Valeur fixe si Dx_fixe = True
+        # Dx calculation mode
+        self.Dx_fixed = Dx_fixed
+        self.Dx_fixed_value = -67.5227  # Fixed value if Dx_fixed = True
 
-        # Matériau
+        # Material
         self.material = material
 
-        # Propriétés des matériaux (en N/mm²)
+        # Material properties (in N/mm²)
         self.material_properties = {
             'BE_CU': 131e3,
             'INVAR': 141e3,
-            'INVAR36': 141e3,
             'STEEL': 210e3
         }
 
-        # Paramètres géométriques du système rod/mass
+        # Geometric parameters of rod/mass system
         self.H = 3.875  # rod vertical thickness (mm)
         self.D = 39.99  # mass block height (mm)
         self.d = 13.96  # mass block length (mm)
@@ -148,35 +174,39 @@ class ModularBladeConfig:
         self.rho = 7.85e-6  # steel density (kg/mm³)
         self.depth = 63.0  # structure width/depth (mm)
 
-        # Paramètres du système flexure
+        # Flexure system parameters
         self.k_flex = 44.3  # mN·m
         self.r_s = 65.22  # mm
 
-        # Plages de recherche
+        # Search ranges
         self.w_range = np.arange(10, 60.1, 0.1)
         self.h_range = np.arange(0.05, 0.41, 0.01)
         self.L_range = np.arange(93.0, 110.1, 0.05)
 
-        # Calcul de l'inertie du système (constante)
+        # Calculate material-specific performance ratios
+        self.perf_min, self.perf_max = calculate_ideal_perf_ratio_range(material)
+
+        # System inertia calculation (constant)
         self.I_system = self._calculate_system_inertia()
 
-        # Calcul de la performance de référence (basée sur la géométrie de référence)
+        # Reference performance calculation (based on reference geometry)
         self.performance_ref = self._calculate_performance(self.width_ref, self.thickness_ref, self.length_ref)
 
-        # NOUVELLES VALEURS CALCULÉES:
-        # self.perf_ratio_min = self.perf_min
-        # self.perf_ratio_max = self.perf_max
+        # Use calculated values for this material
+        self.perf_ratio_min = self.perf_min
+        self.perf_ratio_max = self.perf_max
 
-        self.perf_ratio_min = 1.02
-        self.perf_ratio_max = 1.03
+        # self.perf_ratio_min = 1.02
+        # self.perf_ratio_max = 1.03
 
-
-        print(f"Configuration: Dx_fixe = {self.Dx_fixe}")
-        print(f"Performance de référence: {self.performance_ref:.6f}")
-        print(f"Inertie système: {self.I_system:.3f} kg·mm²")
+        print(f"Configuration: Material = {self.material}, Dx_fixed = {self.Dx_fixed}")
+        print(f"Perf_ratio range: [{self.perf_ratio_min:.6f}, {self.perf_ratio_max:.6f}]")
+        print(f"Configuration: Dx_fixed = {self.Dx_fixed}")
+        print(f"Reference performance: {self.performance_ref:.6f}")
+        print(f"System inertia: {self.I_system:.3f} kg·mm²")
 
     def _calculate_system_inertia(self) -> float:
-        """Calcule l'inertie totale du système rod/mass"""
+        """Calculate total inertia of rod/mass system"""
         h_rod_segment = self.l - self.r - self.d
 
         I_barre_rod_g = self.rho * self.depth * h_rod_segment * (
@@ -192,53 +222,53 @@ class ModularBladeConfig:
         return I_barre_rod_g + I_barre_mass + I_barre_rod_d
 
     def get_material_E(self, material: str = None) -> float:
-        """Module d'Young du matériau (en N/mm²)"""
+        """Young's modulus of material (in N/mm²)"""
         if material is None:
             material = self.material
         return self.material_properties[material]
 
     def _calculate_Dx(self, length: float) -> float:
-        """Calcule Dx selon le mode choisi"""
-        if self.Dx_fixe:
+        """Calculate Dx according to chosen mode"""
+        if self.Dx_fixed:
             return self.Dx_fixed_value
         else:
             R = length / math.pi
             return -2 * R
 
     def _calculate_performance(self, width: float, thickness: float, length: float, material: str = None) -> float:
-        """Calcule k*rs² qui doit rester constant selon l'équation d'équilibre"""
+        """Calculate k*rs² which must remain constant according to equilibrium equation"""
         E = self.get_material_E(material)
 
-        # Raideur théorique de la lame [N·mm]
+        # Theoretical blade stiffness [N·mm]
         k = (math.pi ** 2 / 6) * E * width * thickness ** 3 / length ** 3
-        k_mNm = k * 1e3  # Conversion en mN·m
+        k_mNm = k * 1e3  # Conversion to mN·m
 
-        # rs est la distance dx (bras de levier)
+        # rs is the dx distance (lever arm)
         Dx = self._calculate_Dx(length)
         rs = abs(Dx)  # rs = |Dx|
 
         # Performance = k * rs²
-        # C'est cette valeur qui doit rester constante pour maintenir l'équilibre
+        # This value must remain constant to maintain equilibrium
         performance = k_mNm * (rs ** 2)
 
         return performance
 
     def _calculate_lever_arm(self, length: float) -> float:
-        """Calcule rs (distance dx) - le bras de levier dans l'équation d'équilibre"""
+        """Calculate rs (dx distance) - the lever arm in equilibrium equation"""
         Dx = self._calculate_Dx(length)
         return abs(Dx)  # rs = |Dx|
 
     def is_performance_ratio_valid(self, performance: float) -> bool:
-        """Vérifie si le ratio de performance est dans la plage idéale"""
+        """Check if performance ratio is within ideal range"""
         perf_ratio = performance / self.performance_ref
         return self.perf_ratio_min <= perf_ratio <= self.perf_ratio_max
 
     def generate_configs(self, config_type: ConfigurationType, fixed_value: float, mode: VariationMode) -> List[Dict]:
-        """Génère des configurations selon le type"""
+        """Generate configurations according to type"""
         configurations = []
 
         if config_type == ConfigurationType.L_CONSTANT:
-            # L fixe, varier h et w
+            # L fixed, vary h and w
             for h in self.h_range:
                 for w in self.w_range:
                     perf = self._calculate_performance(w, h, fixed_value)
@@ -248,7 +278,7 @@ class ModularBladeConfig:
             return self._filter_by_mode(configurations, mode, 'thickness', 'width')
 
         elif config_type == ConfigurationType.H_CONSTANT:
-            # h fixe, varier L et w
+            # h fixed, vary L and w
             for L in self.L_range:
                 for w in self.w_range:
                     perf = self._calculate_performance(w, fixed_value, L)
@@ -258,7 +288,7 @@ class ModularBladeConfig:
             return self._filter_by_mode(configurations, mode, 'length', 'width')
 
         elif config_type == ConfigurationType.W_CONSTANT:
-            # w fixe, varier L et h
+            # w fixed, vary L and h
             for L in self.L_range:
                 for h in self.h_range:
                     perf = self._calculate_performance(fixed_value, h, L)
@@ -271,13 +301,13 @@ class ModularBladeConfig:
 
     def _create_config_dict(self, width: float, thickness: float, length: float,
                             performance: float, config_type: ConfigurationType) -> Dict:
-        """Crée un dictionnaire de configuration"""
+        """Create configuration dictionary"""
         perf_ratio = performance / self.performance_ref
         perf_optimal = (self.perf_ratio_min + self.perf_ratio_max) / 2
         Dx = self._calculate_Dx(length)
         rs = abs(Dx)  # rs = |Dx|
 
-        # Calcul de la raideur pour information
+        # Stiffness calculation for information
         E = self.get_material_E()
         k = (math.pi ** 2 / 6) * E * width * thickness ** 3 / length ** 3
         k_mNm = k * 1e3
@@ -289,9 +319,9 @@ class ModularBladeConfig:
             'performance': performance,  # k * rs²
             'perf_ratio': perf_ratio,
             'Dx': Dx,
-            'rs': rs,  # Bras de levier (distance dx)
-            'k_mNm': k_mNm,  # Raideur seule
-            'k_times_rs_squared': performance,  # k * rs² (même que performance)
+            'rs': rs,  # Lever arm (dx distance)
+            'k_mNm': k_mNm,  # Stiffness alone
+            'k_times_rs_squared': performance,  # k * rs² (same as performance)
             'config_type': config_type,
             'perf_error_from_optimal': abs(perf_ratio - perf_optimal),
             'material': self.material
@@ -299,7 +329,7 @@ class ModularBladeConfig:
 
     def _filter_by_mode(self, configurations: List[Dict], mode: VariationMode,
                         param1: str, param2: str) -> List[Dict]:
-        """Filtre les configurations selon le mode de variation"""
+        """Filter configurations according to variation mode"""
         if not configurations:
             return []
 
@@ -336,7 +366,7 @@ class ModularBladeConfig:
         return configurations
 
     def find_all_configurations(self) -> Dict[str, List[Dict]]:
-        """Trouve toutes les configurations possibles"""
+        """Find all possible configurations"""
         all_configs = {}
 
         # L constant
@@ -354,19 +384,19 @@ class ModularBladeConfig:
         return all_configs
 
     def _get_minmax_configs(self, configs: List[Dict], config_type: ConfigurationType) -> Dict:
-        """Extrait les configurations min/max selon le type"""
+        """Extract min/max configurations according to type"""
         if not configs:
             return {}
 
         minmax_configs = {}
 
         if config_type == ConfigurationType.L_CONSTANT:
-            # Pour L constant, on cherche h min et h max
+            # For L constant, look for h min and h max
             h_values = [config['thickness'] for config in configs]
             h_min = min(h_values)
             h_max = max(h_values)
 
-            # Trouver les configurations correspondantes
+            # Find corresponding configurations
             h_min_config = next(config for config in configs if config['thickness'] == h_min)
             h_max_config = next(config for config in configs if config['thickness'] == h_max)
 
@@ -376,12 +406,12 @@ class ModularBladeConfig:
             }
 
         elif config_type == ConfigurationType.H_CONSTANT:
-            # Pour h constant, on cherche L min et L max
+            # For h constant, look for L min and L max
             L_values = [config['length'] for config in configs]
             L_min = min(L_values)
             L_max = max(L_values)
 
-            # Trouver les configurations correspondantes
+            # Find corresponding configurations
             L_min_config = next(config for config in configs if config['length'] == L_min)
             L_max_config = next(config for config in configs if config['length'] == L_max)
 
@@ -391,12 +421,12 @@ class ModularBladeConfig:
             }
 
         elif config_type == ConfigurationType.W_CONSTANT:
-            # Pour w constant, on cherche L min et L max
+            # For w constant, look for L min and L max
             L_values = [config['length'] for config in configs]
             L_min = min(L_values)
             L_max = max(L_values)
 
-            # Trouver les configurations correspondantes
+            # Find corresponding configurations
             L_min_config = next(config for config in configs if config['length'] == L_min)
             L_max_config = next(config for config in configs if config['length'] == L_max)
 
@@ -408,14 +438,14 @@ class ModularBladeConfig:
         return minmax_configs
 
     def print_configurations_fixed_dx(self, configs: List[Dict], title: str):
-        """Affiche les configurations pour Dx fixe"""
+        """Display configurations for fixed Dx"""
         if not configs:
             print(f"\n=== {title} ===")
-            print("Aucune configuration trouvée.")
+            print("No configuration found.")
             return
 
         print(f"\n=== {title} ({len(configs)} configurations) ===")
-        print("Rang\tL(mm)\t\th(mm)\tw(mm)\tDx(mm)\trs(mm)\tperf_ratio\tErreur")
+        print("Rank\tL(mm)\t\th(mm)\tw(mm)\tDx(mm)\trs(mm)\tperf_ratio\tError")
         print("-" * 85)
 
         for i, config in enumerate(configs[:20], 1):
@@ -423,18 +453,18 @@ class ModularBladeConfig:
                   f"{config['width']:.1f}\t{config['Dx']:.2f}\t{config['rs']:.2f}\t"
                   f"{config['perf_ratio']:.4f}\t{config['perf_error_from_optimal']:.6f}")
 
-        # Affichage des valeurs min/max
+        # Display min/max values
         self._print_minmax_fixed_dx(configs, title)
 
     def print_configurations_variable_dx(self, configs: List[Dict], title: str):
-        """Affiche les configurations pour Dx variable avec focus sur k*rs²"""
+        """Display configurations for variable Dx with focus on k*rs²"""
         if not configs:
             print(f"\n=== {title} ===")
-            print("Aucune configuration trouvée.")
+            print("No configuration found.")
             return
 
         print(f"\n=== {title} ({len(configs)} configurations) ===")
-        print("Rang\tL(mm)\t\th(mm)\tw(mm)\tDx(mm)\trs(mm)\tk(mN·m)\trs²(mm²)\tk×rs²\tRatio\tErreur")
+        print("Rank\tL(mm)\t\th(mm)\tw(mm)\tDx(mm)\trs(mm)\tk(mN·m)\trs²(mm²)\tk×rs²\tRatio\tError")
         print("-" * 120)
 
         for i, config in enumerate(configs[:20], 1):
@@ -444,25 +474,25 @@ class ModularBladeConfig:
                   f"{config['k_mNm']:.1f}\t\t{rs_squared:.1f}\t\t{config['k_times_rs_squared']:.1f}\t"
                   f"{config['perf_ratio']:.4f}\t{config['perf_error_from_optimal']:.6f}")
 
-        # Affichage des valeurs min/max
+        # Display min/max values
         self._print_minmax_variable_dx(configs, title)
 
     def _print_minmax_fixed_dx(self, configs: List[Dict], title: str):
-        """Affiche les valeurs min/max pour Dx fixe"""
+        """Display min/max values for fixed Dx"""
         if not configs:
             return
 
-        # Déterminer le type de configuration
+        # Determine configuration type
         config_type = configs[0]['config_type']
         minmax_configs = self._get_minmax_configs(configs, config_type)
 
         if not minmax_configs:
             return
 
-        # Extraire le nom de base du titre
+        # Extract base title name
         base_title = title.split('(')[0].strip()
-        print(f"\n=== {base_title} (Valeurs Min / Max) ===")
-        print("Info\tL(mm)\t\th(mm)\tw(mm)\tDx(mm)\trs(mm)\tperf_ratio\tErreur")
+        print(f"\n=== {base_title} (Min / Max Values) ===")
+        print("Info\tL(mm)\t\th(mm)\tw(mm)\tDx(mm)\trs(mm)\tperf_ratio\tError")
         print("-" * 85)
 
         for key, config in minmax_configs.items():
@@ -472,21 +502,21 @@ class ModularBladeConfig:
                   f"{config['perf_ratio']:.4f}\t{config['perf_error_from_optimal']:.6f}")
 
     def _print_minmax_variable_dx(self, configs: List[Dict], title: str):
-        """Affiche les valeurs min/max pour Dx variable"""
+        """Display min/max values for variable Dx"""
         if not configs:
             return
 
-        # Déterminer le type de configuration
+        # Determine configuration type
         config_type = configs[0]['config_type']
         minmax_configs = self._get_minmax_configs(configs, config_type)
 
         if not minmax_configs:
             return
 
-        # Extraire le nom de base du titre
+        # Extract base title name
         base_title = title.split('(')[0].strip()
-        print(f"\n=== {base_title} (Valeurs Min / Max) ===")
-        print("Info\tL(mm)\t\th(mm)\tw(mm)\tDx(mm)\trs(mm)\tk(mN·m)\trs²(mm²)\tk×rs²\tRatio\tErreur")
+        print(f"\n=== {base_title} (Min / Max Values) ===")
+        print("Info\tL(mm)\t\th(mm)\tw(mm)\tDx(mm)\trs(mm)\tk(mN·m)\trs²(mm²)\tk×rs²\tRatio\tError")
         print("-" * 120)
 
         for key, config in minmax_configs.items():
@@ -498,13 +528,13 @@ class ModularBladeConfig:
                   f"{config['perf_ratio']:.4f}\t{config['perf_error_from_optimal']:.6f}")
 
     def verify_calculation(self, length: float, thickness: float, width: float, material: str = None):
-        """Vérifie un calcul spécifique"""
+        """Verify a specific calculation"""
         if material is None:
             material = self.material
 
-        print(f"\n=== VÉRIFICATION CALCUL ===")
-        print(f"Paramètres: L={length}, h={thickness}, w={width}, matériau={material}")
-        print(f"Mode Dx: {'Fixe' if self.Dx_fixe else 'Variable'}")
+        print(f"\n=== CALCULATION VERIFICATION ===")
+        print(f"Parameters: L={length}, h={thickness}, w={width}, material={material}")
+        print(f"Dx mode: {'Fixed' if self.Dx_fixed else 'Variable'}")
 
         E = self.get_material_E(material)
         Dx = self._calculate_Dx(length)
@@ -521,63 +551,63 @@ class ModularBladeConfig:
         print(f"k = {k_mNm:.2f} mN·m")
         print(f"rs² = {rs ** 2:.2f} mm²")
         print(f"k × rs² = {performance:.2f} mN·m·mm²")
-        print(f"Performance de référence (k × rs²)_ref = {self.performance_ref:.2f} mN·m·mm²")
+        print(f"Reference performance (k × rs²)_ref = {self.performance_ref:.2f} mN·m·mm²")
         print(f"Ratio (k × rs²)/(k × rs²)_ref = {perf_ratio:.6f}")
-        print(f"Dans la plage acceptable? {self.is_performance_ratio_valid(performance)}")
+        print(f"Within acceptable range? {self.is_performance_ratio_valid(performance)}")
         print()
-        print("INTERPRÉTATION PHYSIQUE:")
-        print(f"- Pour maintenir l'équilibre, k × rs² doit rester proche de {self.performance_ref:.2f}")
-        print(f"- Si rs diminue, k doit augmenter proportionnellement à 1/rs²")
-        print(f"- Si rs augmente, k peut diminuer proportionnellement à 1/rs²")
-        print(f"Dans la plage acceptable? {self.is_performance_ratio_valid(performance)}")
+        print("PHYSICAL INTERPRETATION:")
+        print(f"- To maintain equilibrium, k × rs² must stay close to {self.performance_ref:.2f}")
+        print(f"- If rs decreases, k must increase proportionally to 1/rs²")
+        print(f"- If rs increases, k can decrease proportionally to 1/rs²")
+        print(f"Within acceptable range? {self.is_performance_ratio_valid(performance)}")
 
     def generate_all_configs_perf_filtered(self, config_type: ConfigurationType, fixed_value: float) -> List[Dict]:
-        """Génère toutes les configurations qui respectent le critère de perf_ratio (sans filtrage par percentiles)"""
+        """Generate all configurations that respect perf_ratio criterion (without percentile filtering)"""
         valid_configurations = []
 
         if config_type == ConfigurationType.L_CONSTANT:
-            # L fixe, varier h et w
+            # L fixed, vary h and w
             for h in self.h_range:
                 for w in self.w_range:
                     perf = self._calculate_performance(w, h, fixed_value)
-                    if self.is_performance_ratio_valid(perf):  # Filtrage par perf_ratio uniquement
+                    if self.is_performance_ratio_valid(perf):  # Filter by perf_ratio only
                         config = self._create_config_dict(w, h, fixed_value, perf, config_type)
                         valid_configurations.append(config)
 
         elif config_type == ConfigurationType.H_CONSTANT:
-            # h fixe, varier L et w
+            # h fixed, vary L and w
             for L in self.L_range:
                 for w in self.w_range:
                     perf = self._calculate_performance(w, fixed_value, L)
-                    if self.is_performance_ratio_valid(perf):  # Filtrage par perf_ratio uniquement
+                    if self.is_performance_ratio_valid(perf):  # Filter by perf_ratio only
                         config = self._create_config_dict(w, fixed_value, L, perf, config_type)
                         valid_configurations.append(config)
 
         elif config_type == ConfigurationType.W_CONSTANT:
-            # w fixe, varier L et h
+            # w fixed, vary L and h
             for L in self.L_range:
                 for h in self.h_range:
                     perf = self._calculate_performance(fixed_value, h, L)
-                    if self.is_performance_ratio_valid(perf):  # Filtrage par perf_ratio uniquement
+                    if self.is_performance_ratio_valid(perf):  # Filter by perf_ratio only
                         config = self._create_config_dict(fixed_value, h, L, perf, config_type)
                         valid_configurations.append(config)
 
         return valid_configurations
 
     def _get_global_minmax_configs(self, all_configs: List[Dict], config_type: ConfigurationType) -> Dict:
-        """Extrait les configurations min/max globales selon le type (sans filtrage perf_ratio)"""
+        """Extract global min/max configurations according to type (without perf_ratio filtering)"""
         if not all_configs:
             return {}
 
         minmax_configs = {}
 
         if config_type == ConfigurationType.L_CONSTANT:
-            # Pour L constant, on cherche h min et h max globaux
+            # For L constant, look for global h min and h max
             h_values = [config['thickness'] for config in all_configs]
             h_min = min(h_values)
             h_max = max(h_values)
 
-            # Trouver les configurations correspondantes (prendre la première occurrence)
+            # Find corresponding configurations (take first occurrence)
             h_min_config = next(config for config in all_configs if config['thickness'] == h_min)
             h_max_config = next(config for config in all_configs if config['thickness'] == h_max)
 
@@ -587,12 +617,12 @@ class ModularBladeConfig:
             }
 
         elif config_type == ConfigurationType.H_CONSTANT:
-            # Pour h constant, on cherche L min et L max globaux
+            # For h constant, look for global L min and L max
             L_values = [config['length'] for config in all_configs]
             L_min = min(L_values)
             L_max = max(L_values)
 
-            # Trouver les configurations correspondantes
+            # Find corresponding configurations
             L_min_config = next(config for config in all_configs if config['length'] == L_min)
             L_max_config = next(config for config in all_configs if config['length'] == L_max)
 
@@ -602,12 +632,12 @@ class ModularBladeConfig:
             }
 
         elif config_type == ConfigurationType.W_CONSTANT:
-            # Pour w constant, on cherche L min et L max globaux
+            # For w constant, look for global L min and L max
             L_values = [config['length'] for config in all_configs]
             L_min = min(L_values)
             L_max = max(L_values)
 
-            # Trouver les configurations correspondantes
+            # Find corresponding configurations
             L_min_config = next(config for config in all_configs if config['length'] == L_min)
             L_max_config = next(config for config in all_configs if config['length'] == L_max)
 
@@ -618,24 +648,24 @@ class ModularBladeConfig:
 
         return minmax_configs
 
-    def print_global_extremes_fixed_dx(self, config_type: ConfigurationType, fixed_value: float, title_base: str):
-        """Affiche les valeurs extrêmes globales pour Dx fixe"""
-        # Générer toutes les configurations sans filtrage
+    def print_global_extremes_fixed_dx(self, config_type, fixed_value, title_base):
+        """Print global extreme values for fixed Dx"""
+        # Generate all configurations without filtering
         all_configs = self.generate_all_configs_perf_filtered(config_type, fixed_value)
 
         if not all_configs:
-            print(f"\n=== {title_base} (Valeurs Min / Max des valeurs non filtrées) ===")
-            print("Aucune configuration trouvée.")
+            print(f"\n=== {title_base} (Min / Max Values of unfiltered values) ===")
+            print("No configuration found.")
             return
 
-        # Obtenir les configurations min/max
+        # Get min/max configurations
         minmax_configs = self._get_global_minmax_configs(all_configs, config_type)
 
         if not minmax_configs:
             return
 
-        print(f"\n=== {title_base} (Valeurs Min / Max des valeurs non filtrées) ===")
-        print("Info\tL(mm)\t\th(mm)\tw(mm)\tDx(mm)\trs(mm)\tperf_ratio\tErreur")
+        print(f"\n=== {title_base} (Min / Max Values of unfiltered values) ===")
+        print("Info\tL(mm)\t\th(mm)\tw(mm)\tDx(mm)\trs(mm)\tperf_ratio\tError")
         print("-" * 85)
 
         for key, config in minmax_configs.items():
@@ -644,24 +674,24 @@ class ModularBladeConfig:
                   f"{config['width']:.1f}\t{config['Dx']:.2f}\t{config['rs']:.2f}\t"
                   f"{config['perf_ratio']:.4f}\t{config['perf_error_from_optimal']:.6f}")
 
-    def print_global_extremes_variable_dx(self, config_type: ConfigurationType, fixed_value: float, title_base: str):
-        """Affiche les valeurs extrêmes globales pour Dx variable"""
-        # Générer toutes les configurations sans filtrage
+    def print_global_extremes_variable_dx(self, config_type, fixed_value, title_base):
+        """Print global extreme values for variable Dx"""
+        # Generate all configurations without filtering
         all_configs = self.generate_all_configs_perf_filtered(config_type, fixed_value)
 
         if not all_configs:
-            print(f"\n=== {title_base} (Valeurs Min / Max des valeurs non filtrées) ===")
-            print("Aucune configuration trouvée.")
+            print(f"\n=== {title_base} (Min / Max Values of unfiltered values) ===")
+            print("No configuration found.")
             return
 
-        # Obtenir les configurations min/max
+        # Get min/max configurations
         minmax_configs = self._get_global_minmax_configs(all_configs, config_type)
 
         if not minmax_configs:
             return
 
-        print(f"\n=== {title_base} (Valeurs Min / Max des valeurs non filtrées) ===")
-        print("Info\tL(mm)\t\th(mm)\tw(mm)\tDx(mm)\trs(mm)\tk(mN·m)\trs²(mm²)\tk×rs²\tRatio\tErreur")
+        print(f"\n=== {title_base} (Min / Max Values of unfiltered values) ===")
+        print("Info\tL(mm)\t\th(mm)\tw(mm)\tDx(mm)\trs(mm)\tk(mN.m)\trs^2(mm^2)\tk*rs^2\tRatio\tError")
         print("-" * 120)
 
         for key, config in minmax_configs.items():
@@ -673,23 +703,23 @@ class ModularBladeConfig:
                   f"{config['perf_ratio']:.4f}\t{config['perf_error_from_optimal']:.6f}")
 
     def compare_modes_detailed_with_global_extremes(self):
-        """Compare les deux modes avec tableaux détaillés + valeurs extrêmes globales"""
+        """Compare both modes with detailed tables + global extreme values"""
         print(f"\n{'=' * 100}")
-        print("COMPARAISON DÉTAILLÉE DES MODES Dx FIXE vs VARIABLE (avec extrêmes globaux)")
+        print("DETAILED COMPARISON OF FIXED Dx vs VARIABLE Dx MODES (with global extremes)")
         print(f"{'=' * 100}")
 
-        # Génération des configurations pour Dx fixe
-        print("\n" + "=" * 50 + " Dx FIXE " + "=" * 50)
+        # Generate configurations for fixed Dx
+        print("\n" + "=" * 25 + " FIXED Dx " + "=" * 25)
         self.Dx_fixe = True
         configs_fixed = self.find_all_configurations()
 
-        # Tableaux filtrés existants
+        # Existing filtered tables
         self.print_configurations_fixed_dx(
             configs_fixed['L_constant_optimal'],
-            f"L CONSTANT = {self.length_ref:.2f}mm - {self.material} (Dx FIXE)"
+            f"L CONSTANT = {self.length_ref:.2f}mm - {self.material} (FIXED Dx)"
         )
 
-        # NOUVEAU: Tableaux des extrêmes globaux
+        # NEW: Global extremes tables
         self.print_global_extremes_fixed_dx(
             ConfigurationType.L_CONSTANT,
             self.length_ref,
@@ -698,10 +728,10 @@ class ModularBladeConfig:
 
         self.print_configurations_fixed_dx(
             configs_fixed['h_constant_optimal'],
-            f"h CONSTANT = {self.thickness_ref:.3f}mm - {self.material} (Dx FIXE)"
+            f"h CONSTANT = {self.thickness_ref:.3f}mm - {self.material} (FIXED Dx)"
         )
 
-        # NOUVEAU: Tableaux des extrêmes globaux
+        # NEW: Global extremes tables
         self.print_global_extremes_fixed_dx(
             ConfigurationType.H_CONSTANT,
             self.thickness_ref,
@@ -710,30 +740,30 @@ class ModularBladeConfig:
 
         self.print_configurations_fixed_dx(
             configs_fixed['w_constant_optimal'],
-            f"w CONSTANT = {self.width_ref:.1f}mm - {self.material} (Dx FIXE)"
+            f"w CONSTANT = {self.width_ref:.1f}mm - {self.material} (FIXED Dx)"
         )
 
-        # NOUVEAU: Tableaux des extrêmes globaux
+        # NEW: Global extremes tables
         self.print_global_extremes_fixed_dx(
             ConfigurationType.W_CONSTANT,
             self.width_ref,
             f"w CONSTANT = {self.width_ref:.1f}mm - {self.material}"
         )
 
-        # Génération des configurations pour Dx variable
-        print("\n" + "=" * 50 + " Dx VARIABLE " + "=" * 50)
+        # Generate configurations for variable Dx
+        print("\n" + "=" * 25 + " VARIABLE Dx " + "=" * 25)
         self.Dx_fixe = False
-        # Recalcul de la référence pour le mode variable
+        # Recalculate reference for variable mode
         self.performance_ref = self._calculate_performance(self.width_ref, self.thickness_ref, self.length_ref)
         configs_variable = self.find_all_configurations()
 
-        # Tableaux filtrés existants
+        # Existing filtered tables
         self.print_configurations_variable_dx(
             configs_variable['L_constant_optimal'],
-            f"L CONSTANT = {self.length_ref:.2f}mm - {self.material} (Dx VARIABLE)"
+            f"L CONSTANT = {self.length_ref:.2f}mm - {self.material} (VARIABLE Dx)"
         )
 
-        # NOUVEAU: Tableaux des extrêmes globaux
+        # NEW: Global extremes tables
         self.print_global_extremes_variable_dx(
             ConfigurationType.L_CONSTANT,
             self.length_ref,
@@ -742,10 +772,10 @@ class ModularBladeConfig:
 
         self.print_configurations_variable_dx(
             configs_variable['h_constant_optimal'],
-            f"h CONSTANT = {self.thickness_ref:.3f}mm - {self.material} (Dx VARIABLE)"
+            f"h CONSTANT = {self.thickness_ref:.3f}mm - {self.material} (VARIABLE Dx)"
         )
 
-        # NOUVEAU: Tableaux des extrêmes globaux
+        # NEW: Global extremes tables
         self.print_global_extremes_variable_dx(
             ConfigurationType.H_CONSTANT,
             self.thickness_ref,
@@ -754,39 +784,88 @@ class ModularBladeConfig:
 
         self.print_configurations_variable_dx(
             configs_variable['w_constant_optimal'],
-            f"w CONSTANT = {self.width_ref:.1f}mm - {self.material} (Dx VARIABLE)"
+            f"w CONSTANT = {self.width_ref:.1f}mm - {self.material} (VARIABLE Dx)"
         )
 
-        # NOUVEAU: Tableaux des extrêmes globaux
+        # NEW: Global extremes tables
         self.print_global_extremes_variable_dx(
             ConfigurationType.W_CONSTANT,
             self.width_ref,
             f"w CONSTANT = {self.width_ref:.1f}mm - {self.material}"
         )
 
+    def find_extreme_configurations(self) -> Dict[str, Dict]:
+        """Trouve les configurations extrêmes pour chaque paramètre sans fixer les autres"""
+        results = {
+            'w_max': None,
+            'w_min': None,
+            'L_max': None,
+            'L_min': None,
+            'h_max': None,
+            'h_min': None,
+        }
 
+        for L in self.L_range:
+            for h in self.h_range:
+                for w in self.w_range:
+                    perf = self._calculate_performance(w, h, L)
+                    if not self.is_performance_ratio_valid(perf):
+                        continue
+                    config = self._create_config_dict(w, h, L, perf, ConfigurationType.W_CONSTANT)
+
+                    # Update extreme values
+                    if results['w_max'] is None or w > results['w_max']['width']:
+                        results['w_max'] = config
+                    if results['w_min'] is None or w < results['w_min']['width']:
+                        results['w_min'] = config
+                    if results['L_max'] is None or L > results['L_max']['length']:
+                        results['L_max'] = config
+                    if results['L_min'] is None or L < results['L_min']['length']:
+                        results['L_min'] = config
+                    if results['h_max'] is None or h > results['h_max']['thickness']:
+                        results['h_max'] = config
+                    if results['h_min'] is None or h < results['h_min']['thickness']:
+                        results['h_min'] = config
+
+        return results
+
+
+# Then modify the main() function:
 def main():
-    """Fonction principale avec comparaison des modes"""
+    """Main function with mode comparison"""
 
-    # Analyse avec BE_CU
-    blade_config = ModularBladeConfig(material='BE_CU', Dx_fixe=False)
+    # Analysis with configurable material
+    blade_config = ModularBladeConfig(material=MATERIAL_CONFIG, Dx_fixed=False)
 
-    # Vérification avec la configuration de référence
-    print("VÉRIFICATION MODE VARIABLE:")
-    blade_config.verify_calculation(105.25, 0.24, 45.0, 'BE_CU')
+    # Verification with reference configuration
+    print("VERIFICATION VARIABLE MODE:")
+    blade_config.verify_calculation(105.25, 0.24, 45.0, MATERIAL_CONFIG)
 
     blade_config.Dx_fixe = True
     blade_config.performance_ref = blade_config._calculate_performance(
         blade_config.width_ref, blade_config.thickness_ref, blade_config.length_ref
-    )
-    print("\nVÉRIFICATION MODE FIXE:")
-    blade_config.verify_calculation(105.25, 0.24, 45.0, 'BE_CU')
+     )
+    print("\nVERIFICATION FIXED MODE:")
+    blade_config.verify_calculation(105.25, 0.24, 45.0, MATERIAL_CONFIG)
 
-    # Comparaison détaillée des modes
+    # Detailed comparison of modes
     blade_config.compare_modes_detailed_with_global_extremes()
+
+
 
     return blade_config
 
-
 if __name__ == "__main__":
     config = main()
+
+    print("\n=== EXTREME CONFIGURATIONS (All parameters free) ===")
+    extremes = config.find_extreme_configurations()
+
+    for key, conf in extremes.items():
+        print(f"\n--- {key.upper()} ---")
+        print(f"L = {conf['length']:.2f} mm")
+        print(f"h = {conf['thickness']:.3f} mm")
+        print(f"w = {conf['width']:.2f} mm")
+        print(f"Dx = {conf['Dx']:.2f} mm")
+        print(f"perf_ratio = {conf['perf_ratio']:.6f}")
+        print(f"k × rs² = {conf['performance']:.2f} mN·mm")

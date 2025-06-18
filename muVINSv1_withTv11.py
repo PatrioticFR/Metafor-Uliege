@@ -1,25 +1,25 @@
 # Ultra-high performance inertial sensor for gravitational waves detection
-# gravitational waves detection
 
-# Study of the muVINS with configurable blade parameters - OPTIMIZED VERSION
+# Study of the muVINS with configurable blade parameters , thermal settings, time step and others
+# To change parameters, use the def __init__ in the BladeConfig and the SimulationConfig
+
 # Adrien Pierrat based on the code of Morgane Zeoli
 
+
 # -*- coding: Windows CP1252 -*-
+
+import multiprocessing
+print(f"Nombre de cœurs disponibles : {multiprocessing.cpu_count()}")
 
 from wrap import *
 from wrap.mtFrequencyAnalysisw import *
 import math
 
 # enable full parallelism
-StrVectorBase.useTBB()
-StrMatrixBase.useTBB()
-ContactInteraction.useTBB()
+StrVectorBase.useTBB(True)
+StrMatrixBase.useTBB(True)
+ContactInteraction.useTBB(True)
 
-
-#Ne pas prendre en compte le 0.844 : changer plutot le dx1 (regarder les variations de fréquence)
-#Prendre le dx fixe et changer le materiau
-#Focus on the understanding of the phy. Not in favor of deep optimisation
-#Attention sur le dx lors du changement de materiau
 
 # =============================================================================
 # CONFIGURATION OPTIMISÉE POUR STABILISATION À 0mm
@@ -40,20 +40,20 @@ class BladeConfig:
 
         # Current blade geometry
         self.thickness = 0.24  # current thickness (e/h)
-        self.length = 93.1  # current length (L)
-        self.width = 40.8  # current width
+        self.length = 105.25 # current length (L)
+        self.width = 45.0  # current width
 
         # Material selection: 'BE_CU', 'INVAR', 'STEEL'
-        self.material = 'BE_CU'
+        self.material = 'INVAR'
 
         # Mesh parameters for blade - use your existing values
         self.elements_thickness = 8  # elements through thickness (ne)
-        self.elements_length_factor = 20  # nL = L * this factor
+        self.elements_length_factor = 20  # nL = L * this factors
 
         # Reference equilibrium parameters
         self.enc_ref = 57.32
 
-        self.Dx_fixe = False  #Set to True for Dx = -67.5227 (experimental value) and False for Dx to be calculated
+        self.Dx_fixe = True  #Set to True for Dx = -67.5227 or -2 * R - 0.52 (experimental value) and False for Dx to be calculated
 
     def get_elements_length(self):
         return int(self.length * self.elements_length_factor)
@@ -76,8 +76,9 @@ class BladeConfig:
         enc_opt = self.enc_ref
 
         if self.Dx_fixe:
-            Dx_opt = -67.5227  # Use fixed Dx value
-            print(f"INFO: Dx_fixe is True. Dx set to fixed value: {Dx_opt}.")
+            Dx_opt = -2 * R -0.52  # Use fixed Dx value
+            # Dx_opt = -67.5227  # (experimental value)
+            print(f"INFO: Dx_fixe is True. Calculating Dx = -2 * R - 0.52 = {Dx_opt:.4f} (L={self.length:.2f} mm).")
         else:
             Dx_opt = -2 * R  # Calculate Dx for a semicircle
             print(f"INFO: Dx_fixe is False. Calculating Dx = -2 * R = {Dx_opt:.4f} (L={self.length:.2f} mm).")
@@ -206,7 +207,7 @@ class SimulationConfig:
         self.stabilization_time = 12.0
 
         # Temperature parameters
-        self.enable_thermal = False
+        self.enable_thermal = True
         self.temp_initial_kelvin = 273.15 + 10.0
         self.temp_final_kelvin = 273.15 + 50.0
         self.temp_start_time = 20.0
@@ -524,8 +525,8 @@ def getMetafor(d={}):
     # Elastoplastic behavior laws according to the chosen material
     if blade_config.material == 'BE_CU':
         laws.define(1, LinearIsotropicHardening)
-        laws(1).put(IH_SIGEL, 1000.0)  # Limite elastique approximative pour Be-Cu
-        laws(1).put(IH_H, 1000.0)  # Module d'ecrouissage Be-Cu
+        laws(1).put(IH_SIGEL, 1000.0)  # pproximate elastic limit for BE-CU (~1000 MPa)
+        laws(1).put(IH_H, 1000.0)  # Hardening modulus BE-CU (moderate value)
         yield_num = 1
     elif blade_config.material == 'INVAR':
         laws.define(2, LinearIsotropicHardening)
@@ -827,22 +828,22 @@ def getMetafor(d={}):
         # ADAPTIVE TIME STEPPING based on simulation phases - ENHANCED
         if sim_config.enable_thermal:
             # Phase 1: Mechanical loading (0 to T_load) - progressive refinement
-            tsm.setNextTime(sim_config.loading_time * 0.25, 12, 0.01)  # Early loading Up to 2.5s
-            tsm.setNextTime(sim_config.loading_time * 0.5, 12, 0.005)  # Mid loading Up to 5s
-            tsm.setNextTime(sim_config.loading_time * 0.75, 25, 0.005)  # Late loading Up to 7.5s
-            tsm.setNextTime(sim_config.loading_time, 25, 0.005)  # Final mechanical phase Up to 10s
+            tsm.setNextTime(sim_config.loading_time * 0.25, 6, 0.01)  # Early loading Up to 2.5s
+            tsm.setNextTime(sim_config.loading_time * 0.5, 6, 0.005)  # Mid loading Up to 5s
+            tsm.setNextTime(sim_config.loading_time * 0.75, 12, 0.005)  # Late loading Up to 7.5s
+            tsm.setNextTime(sim_config.loading_time, 13, 0.005)  # Final mechanical phase Up to 10s
 
             # Phase 2: Stabilization (T_load to temp_start_time) - MUCH SMALLER STEPS
-            tsm.setNextTime(sim_config.loading_time + 1.0, 10, 0.01)  # First second after loading Up to 11s
-            tsm.setNextTime(sim_config.loading_time + 2.5, 15, 0.02)  # Intermediate stabilization Up to 12.5s
-            tsm.setNextTime(sim_config.temp_start_time - 2.0, 11, 0.05)  # Pre-thermal Up to 18s
-            tsm.setNextTime(sim_config.temp_start_time, 4, 0.05)  # Just before thermal Up to 20s
+            tsm.setNextTime(sim_config.loading_time + 1.0, 5, 0.01)  # First second after loading Up to 11s
+            tsm.setNextTime(sim_config.loading_time + 2.5, 7, 0.02)  # Intermediate stabilization Up to 12.5s
+            tsm.setNextTime(sim_config.temp_start_time - 2.0, 5, 0.05)  # Pre-thermal Up to 18s
+            tsm.setNextTime(sim_config.temp_start_time, 2, 0.05)  # Just before thermal Up to 20s
 
             # Phase 3: Thermal loading (temp_start_time to temp_end_time) - adaptive steps
             thermal_duration = sim_config.temp_end_time - sim_config.temp_start_time
             tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.1, 3, 0.05)  # Thermal start Up to 21.5s
-            tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.5, 12, 0.05)  # Mid thermal Up to 27.5s
-            tsm.setNextTime(sim_config.temp_end_time, 37, 0.02)  # End thermal - finest steps Up to 35s
+            tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.5, 6, 0.05)  # Mid thermal Up to 27.5s
+            tsm.setNextTime(sim_config.temp_end_time, 18, 0.02)  # End thermal - finest steps Up to 35s
 
             # Phase 4: Final phase - can use larger steps again
             if sim_config.temp_end_time < sim_config.final_time:
@@ -850,9 +851,9 @@ def getMetafor(d={}):
 
         else:
             # Pure mechanical - simpler time stepping
-            tsm.setNextTime(sim_config.loading_time * 0.5, 25, 0.01)
-            tsm.setNextTime(sim_config.loading_time, 50, 0.005)
-            tsm.setNextTime(sim_config.final_time, 40, 0.05)
+            tsm.setNextTime(sim_config.loading_time * 0.5, 13, 0.01) # Up to 5s
+            tsm.setNextTime(sim_config.loading_time, 25, 0.005) # Up to 10s
+            tsm.setNextTime(sim_config.final_time, 20, 0.05) # Up to 30s
 
     else:
         print(f"INFO: Using FIXED time stepping with dt = {sim_config.fixed_timestep_size}.")
@@ -1015,6 +1016,7 @@ def getMetafor(d={}):
                        'max_yield_function_blade')
            hcurves.add(27, IFNodalValueExtractor(interactionset(2), IF_EPL), MaxOperator(),
                        'max_plastic_strain_structure')
+
            max_extractor = 27
         else:
            max_extractor = 14
@@ -1418,7 +1420,7 @@ def postpro_initial():
     print(f'eigenvalues = {[float(v) for v in txt[0].strip().split()]}')
 
 
-def additional_diagnostics():
+def additional_diagnostics(blade_config):
     """Additional diagnostics to verify thermal condition with comprehensive analysis"""
     import os
     import numpy as np
@@ -1514,13 +1516,13 @@ def additional_diagnostics():
 
             if values:
                 # Convert to Celsius
-                initial_C = values[0] - 273.15
-                final_C = values[-1] - 273.15
+                initial_C = values[0] + 273.15
+                final_C = values[-1] + 273.15
                 delta_T = final_C - initial_C
 
                 print(f"{temp_type}:")
-                print(f"  Initial: {initial_C:.1f}°C ({values[0]:.1f}K)")
-                print(f"  Final: {final_C:.1f}°C ({values[-1]:.1f}K)")
+                print(f"  Initial: {initial_C:.1f}°C ({values[0]:.1f}C)")
+                print(f"  Final: {final_C:.1f}°C ({values[-1]:.1f}C)")
                 print(f"  Change: ΔT = {delta_T:.1f}°C")
 
     # Thermal strain analysis
@@ -1677,6 +1679,217 @@ def additional_diagnostics():
     except Exception as e:
         print(f"Error during linearity analysis: {e}")
 
+
+        # ========================================= PLASTICITY ANALYSIS =====================================================
+    print('\n=== PLASTICITY ANALYSIS ===')
+
+    # Define material properties for reference
+    material_properties = {
+        'BE_CU': {'elastic_limit': 1000.0, 'hardening': 1000.0},
+        'INVAR': {'elastic_limit': 250.0, 'hardening': 800.0}
+    }
+
+    # Determine current material (you'll need to pass this or detect it)
+    current_material = blade_config.material  # Change this based on your blade_config.material
+    elastic_limit = material_properties[current_material]['elastic_limit']
+
+    print(f"Material: {current_material}")
+    print(f"Elastic limit: {elastic_limit} MPa")
+
+    # Plasticity files to analyze
+    plasticity_files = {
+        'Max Von Mises Stress': 'Max_VonMises_BeCu.ascii',
+        'Max Plastic Strain': 'max_plastic_strain_blade.ascii',
+        'Mean Plastic Strain': 'mean_plastic_strain_blade.ascii',
+        'Max Plastic Strain Rate': 'max_plastic_strain_rate_blade.ascii',
+        'Max Yield Function': 'max_yield_function_blade.ascii',
+        'Max Yield Stress': 'max_yield_stress_blade.ascii',
+        'Max Triaxiality': 'max_triaxiality_blade.ascii',
+        'Max Principal Stress 1': 'max_principal_stress_1_blade.ascii',
+        'Max Principal Stress 2': 'max_principal_stress_2_blade.ascii',
+        'Max Principal Stress 3': 'max_principal_stress_3_blade.ascii',
+        'Max Pressure': 'max_pressure_blade.ascii'
+    }
+
+    print('\n--- PLASTICITY STATE ANALYSIS ---')
+    plasticity_data = {}
+
+    for param_name, filename in plasticity_files.items():
+        if os.path.exists(filename):
+            try:
+                with open(filename, 'r') as f:
+                    values = [float(line.strip()) for line in f if line.strip()]
+
+                if values:
+                    initial_val = values[0]
+                    final_val = values[-1]
+                    max_val = max(values)
+                    min_val = min(values)
+
+                    plasticity_data[param_name] = {
+                        'initial': initial_val,
+                        'final': final_val,
+                        'maximum': max_val,
+                        'minimum': min_val,
+                        'evolution': final_val - initial_val
+                    }
+
+                    print(f"{param_name}:")
+                    if 'Stress' in param_name or 'Pressure' in param_name:
+                        print(f"  Initial: {initial_val:.2f} MPa")
+                        print(f"  Final: {final_val:.2f} MPa")
+                        print(f"  Maximum: {max_val:.2f} MPa")
+                        print(f"  Evolution: {final_val - initial_val:.2f} MPa")
+                    elif 'Strain' in param_name:
+                        print(f"  Initial: {initial_val:.2e}")
+                        print(f"  Final: {final_val:.2e}")
+                        print(f"  Maximum: {max_val:.2e}")
+                        print(f"  Evolution: {final_val - initial_val:.2e}")
+                    else:
+                        print(f"  Initial: {initial_val:.6f}")
+                        print(f"  Final: {final_val:.6f}")
+                        print(f"  Maximum: {max_val:.6f}")
+                        print(f"  Evolution: {final_val - initial_val:.6f}")
+
+            except Exception as e:
+                print(f"Could not read {filename}: {e}")
+        else:
+            print(f"{param_name}: File not found ({filename})")
+
+    # Plasticity assessment
+    print('\n--- PLASTICITY ASSESSMENT ---')
+
+    if 'Max Von Mises Stress' in plasticity_data:
+        max_stress = plasticity_data['Max Von Mises Stress']['maximum']
+        final_stress = plasticity_data['Max Von Mises Stress']['final']
+
+        print(f"Maximum Von Mises stress reached: {max_stress:.2f} MPa")
+        print(f"Final Von Mises stress: {final_stress:.2f} MPa")
+        print(f"Elastic limit: {elastic_limit:.2f} MPa")
+
+        if max_stress > elastic_limit:
+            overstress = max_stress - elastic_limit
+            overstress_percent = (overstress / elastic_limit) * 100
+            print(f"*** PLASTICITY DETECTED ***")
+            print(f"Overstress: {overstress:.2f} MPa ({overstress_percent:.1f}% above elastic limit)")
+        else:
+            safety_factor = elastic_limit / max_stress
+            print(f"*** ELASTIC BEHAVIOR ***")
+            print(f"Safety factor: {safety_factor:.2f}")
+
+    if 'Max Plastic Strain' in plasticity_data:
+        max_plastic_strain = plasticity_data['Max Plastic Strain']['maximum']
+        final_plastic_strain = plasticity_data['Max Plastic Strain']['final']
+
+        if max_plastic_strain > 1e-8:
+            print(f"*** PLASTIC DEFORMATION CONFIRMED ***")
+            print(f"Maximum plastic strain: {max_plastic_strain:.2e}")
+            print(f"Final plastic strain: {final_plastic_strain:.2e}")
+
+            # Estimate permanent deformation
+            if max_plastic_strain > 1e-6:
+                print(f"*** SIGNIFICANT PLASTIC DEFORMATION ***")
+                print(f"This level of plastic strain may cause permanent changes")
+                print(f"to the sensor's mechanical properties and calibration")
+        else:
+            print(f"No significant plastic strain detected")
+
+    if 'Max Yield Function' in plasticity_data:
+        max_yield_function = plasticity_data['Max Yield Function']['maximum']
+        final_yield_function = plasticity_data['Max Yield Function']['final']
+
+        print(f"Maximum yield function value: {max_yield_function:.6f}")
+        print(f"Final yield function value: {final_yield_function:.6f}")
+
+        if max_yield_function > 1e-6:
+            print(f"*** YIELD FUNCTION ACTIVE (f > 0) ***")
+            print(f"Material is actively yielding during simulation")
+        else:
+            print(f"Yield function remains inactive (f ≤ 0)")
+
+    # Stress state analysis
+    if all(key in plasticity_data for key in
+           ['Max Principal Stress 1', 'Max Principal Stress 2', 'Max Principal Stress 3']):
+        print('\n--- STRESS STATE ANALYSIS ---')
+        sig1_max = plasticity_data['Max Principal Stress 1']['maximum']
+        sig2_max = plasticity_data['Max Principal Stress 2']['maximum']
+        sig3_max = plasticity_data['Max Principal Stress 3']['maximum']
+
+        print(f"Maximum principal stresses:")
+        print(f"  σ₁ = {sig1_max:.2f} MPa")
+        print(f"  σ₂ = {sig2_max:.2f} MPa")
+        print(f"  σ₃ = {sig3_max:.2f} MPa")
+
+        # Determine stress state
+        if abs(sig2_max) < 0.1 * abs(sig1_max) and abs(sig3_max) < 0.1 * abs(sig1_max):
+            print("Stress state: Predominantly uniaxial")
+        elif abs(sig3_max) < 0.1 * max(abs(sig1_max), abs(sig2_max)):
+            print("Stress state: Predominantly plane stress")
+        else:
+            print("Stress state: Triaxial")
+
+    if 'Max Triaxiality' in plasticity_data:
+        max_triax = plasticity_data['Max Triaxiality']['maximum']
+        print(f"Maximum stress triaxiality: {max_triax:.3f}")
+
+        if max_triax > 0.33:
+            print("High triaxiality - potential for void growth")
+        elif max_triax < -0.33:
+            print("Compressive triaxiality - shear-dominated deformation")
+        else:
+            print("Moderate triaxiality - balanced stress state")
+
+    # Correlation with temperature
+    print('\n--- PLASTICITY-TEMPERATURE CORRELATION ---')
+
+    if time_values and 'Max Von Mises Stress' in plasticity_data:
+        try:
+            # Read stress evolution
+            with open('Max_VonMises_BeCu.ascii', 'r') as f:
+                stress_values = [float(line.strip()) for line in f if line.strip()]
+
+            if len(stress_values) == len(time_values):
+                # Find when plasticity starts (stress exceeds elastic limit)
+                plastic_start_indices = [i for i, stress in enumerate(stress_values) if stress > elastic_limit]
+
+                if plastic_start_indices:
+                    plastic_start_time = time_values[plastic_start_indices[0]]
+                    plastic_start_stress = stress_values[plastic_start_indices[0]]
+
+                    print(f"Plasticity initiated at:")
+                    print(f"  Time: {plastic_start_time:.2f} s")
+                    print(f"  Stress: {plastic_start_stress:.2f} MPa")
+
+                    # Correlate with temperature if available
+                    if os.path.exists('temp_mean_blade_K.ascii'):
+                        with open('temp_mean_blade_K.ascii', 'r') as f:
+                            temp_values = [float(line.strip()) for line in f if line.strip()]
+
+                        if len(temp_values) == len(time_values):
+                            plastic_start_temp = temp_values[plastic_start_indices[0]]
+                            plastic_start_temp_C = plastic_start_temp - 273.15
+
+                            print(f"  Temperature at plasticity onset: {plastic_start_temp_C:.1f}°C")
+                            print(f"  Temperature rise from start: {plastic_start_temp_C - 10:.1f}°C")
+                else:
+                    print("No plasticity detected based on stress threshold")
+
+        except Exception as e:
+            print(f"Could not correlate plasticity with temperature: {e}")
+
+    print('\n--- PLASTICITY IMPACT ON SENSOR ---')
+    if 'Max Plastic Strain' in plasticity_data and plasticity_data['Max Plastic Strain']['maximum'] > 1e-6:
+        print("*** WARNING: SIGNIFICANT PLASTICITY DETECTED ***")
+        print("Potential impacts on sensor performance:")
+        print("• Permanent deformation may alter resonant frequencies")
+        print("• Stress relaxation could affect long-term stability")
+        print("• Calibration may drift due to permanent material changes")
+        print("• Consider reducing temperature range or stress levels")
+        print("• Material substitution (higher yield strength) may be needed")
+    else:
+        print("✓ Plasticity levels are minimal - sensor should maintain calibration")
+        print("✓ Elastic behavior preserved - good for long-term stability")
+
     # Displacement analysis - KEY for sensor performance (code original conservé)
     disp_files = {
         "Rod End Y": 'displacement_rod_end_Y.ascii',
@@ -1721,11 +1934,14 @@ def additional_diagnostics():
 
 
 if __name__ == "__main__":
+
+    config = BladeConfig()
+
     # Main analysis : Only one at a time
     postpro()
     #postpro_simple() # Initial way to obtain the modal analysis
     #postpro_with_viz() # Modal analysys with graphs
     #postpro_initial() #Post pro of morgan code
 
-    additional_diagnostics()
+    additional_diagnostics(config)
 

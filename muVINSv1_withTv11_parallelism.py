@@ -1,280 +1,24 @@
-# AUTOMATED SEQUENTIAL SIMULATION SYSTEM
-#muVINSv1_withTv11 but multiple one after another : Goal is to make the programm turn multiple configuration by itself during a night or spare time.
-#Can't manage to make it work: abandoned project for now
-
-import os
-import shutil
-import time
-from datetime import datetime
-from wrap import *
-
-
-class SimulationManager:
-    """Manages sequential execution of multiple Metafor simulations"""
-
-    def __init__(self, base_output_dir=None):
-        # Paths based on your system
-        self.script_path = r"C:\Users\adpie\Desktop\Stage 4A\Metafor\muVINSv1_withTv12.py"
-        self.base_workspace = r"C:\Users\adpie\Desktop\Stage 4A\Metafor\workspace\muVINSv1_withTv12"
-
-        # Results storage
-        if base_output_dir is None:
-            base_output_dir = r"C:\Users\adpie\Desktop\Stage 4A\Metafor\AutomatedResults"
-        self.results_dir = base_output_dir
-
-        # Create results directory
-        os.makedirs(self.results_dir, exist_ok=True)
-
-        # Log file
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.log_file = os.path.join(self.results_dir, f"simulation_log_{timestamp}.txt")
-
-        # Storage for results analysis
-        self.simulation_results = {}
-        self.current_config_index = 0
-        self.configurations = []
-        self.simulation_active = False
-
-        self.log_message("=== AUTOMATED SEQUENTIAL SIMULATION SYSTEM INITIALIZED ===")
-        self.log_message(f"Results directory: {self.results_dir}")
-        self.log_message(f"Log file: {self.log_file}")
-
-    def log_message(self, message, also_print=True):
-        """Log message to file and optionally print"""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_line = f"[{timestamp}] {message}"
-
-        with open(self.log_file, 'a', encoding='utf-8') as f:
-            f.write(log_line + "\n")
-
-        if also_print:
-            print(log_line)
-
-    def define_simulation_configurations(self):
-        """Define all simulation configurations to run"""
-        configurations = []
-
-        # Configuration 1: Baseline Be-Cu with thermal effects
-        config1 = {
-            'name': 'BeCu_Baseline_Thermal',
-            'description': 'Beryllium-Copper blade with thermal loading (10°C → 50°C)',
-            'parameters': {
-                'blade_material': 'BE_CU',
-                'blade_thickness': 0.24,
-                'blade_length': 105.25,
-                'blade_width': 45.0,
-                'enable_thermal': True,
-                'final_time': 3.0,
-                'loading_time': 10.0
-            }
-        }
-
-        # Configuration 2: Be-Cu without thermal effects (mechanical only)
-        config2 = {
-            'name': 'BeCu_Mechanical_Only',
-            'description': 'Beryllium-Copper blade - mechanical loading only',
-            'parameters': {
-                'blade_material': 'BE_CU',
-                'blade_thickness': 0.24,
-                'blade_length': 105.25,
-                'blade_width': 45.0,
-                'enable_thermal': False,
-                'final_time': 3.0,
-                'loading_time': 10.0
-            }
-        }
-
-        configurations.extend([config1, config2])
-
-        self.log_message(f"Defined {len(configurations)} simulation configurations:")
-        for i, config in enumerate(configurations, 1):
-            self.log_message(f"  {i}. {config['name']}: {config['description']}")
-
-        return configurations
-
-    def get_current_simulation_config(self):
-        """Get the current simulation configuration"""
-        if hasattr(self, '_current_override_params'):
-            return self._current_override_params
-        return {}
-
-    def set_current_simulation(self, config_index):
-        """Set which simulation configuration to run"""
-        if 0 <= config_index < len(self.configurations):
-            self.current_config_index = config_index
-            config = self.configurations[config_index]
-            self._current_override_params = config['parameters']
-
-            self.log_message(f"=== STARTING SIMULATION {config_index + 1}/{len(self.configurations)} ===")
-            self.log_message(f"Configuration: {config['name']}")
-            self.log_message(f"Description: {config['description']}")
-            self.log_message(f"Parameters: {config['parameters']}")
-
-            return True
-        return False
-
-    def backup_current_workspace(self, config_name):
-        """Backup the current workspace to preserve results"""
-        if not os.path.exists(self.base_workspace):
-            self.log_message(f"Warning: Workspace {self.base_workspace} does not exist")
-            return None
-
-        # Create backup directory
-        backup_dir = os.path.join(self.results_dir, config_name)
-
-        try:
-            # Remove existing backup if present
-            if os.path.exists(backup_dir):
-                shutil.rmtree(backup_dir)
-
-            # Copy entire workspace
-            shutil.copytree(self.base_workspace, backup_dir)
-            self.log_message(f"Workspace backed up to: {backup_dir}")
-
-            return backup_dir
-
-        except Exception as e:
-            self.log_message(f"Error backing up workspace: {e}")
-            return None
-
-    def clean_workspace_for_next_simulation(self):
-        """Clean workspace for next simulation while preserving essential files"""
-        try:
-            if os.path.exists(self.base_workspace):
-                # Remove result files but keep configuration files
-                for filename in os.listdir(self.base_workspace):
-                    filepath = os.path.join(self.base_workspace, filename)
-                    if filename.endswith('.v') or filename.endswith('.ascii') or filename == 'resFiles.txt':
-                        if os.path.isfile(filepath):
-                            os.remove(filepath)
-                            self.log_message(f"Removed: {filename}")
-
-                self.log_message("Workspace cleaned for next simulation")
-
-        except Exception as e:
-            self.log_message(f"Warning: Could not clean workspace: {e}")
-
-    def has_next_simulation(self):
-        """Check if there are more simulations to run"""
-        return self.current_config_index + 1 < len(self.configurations)
-
-    def advance_to_next_simulation(self):
-        """Advance to the next simulation configuration"""
-        current_config = self.configurations[self.current_config_index]
-
-        self.log_message(f"=== SIMULATION {self.current_config_index + 1} COMPLETED ===")
-
-        # Backup current results
-        backup_dir = self.backup_current_workspace(current_config['name'])
-
-        # Clean workspace for next simulation
-        self.clean_workspace_for_next_simulation()
-
-        # Move to next configuration
-        self.current_config_index += 1
-
-        if self.has_next_simulation():
-            # Set up next simulation
-            self.set_current_simulation(self.current_config_index)
-            self.simulation_active = False  # Reset for next simulation
-            return True
-        else:
-            # All simulations completed
-            self.log_message("\n=== ALL SIMULATIONS COMPLETED ===")
-            self.generate_comparison_report()
-            return False
-
-    def generate_comparison_report(self):
-        """Generate a simple completion report"""
-        self.log_message("\n" + "=" * 80)
-        self.log_message("SIMULATION SEQUENCE COMPLETED")
-        self.log_message("=" * 80)
-        self.log_message(f"Total simulations run: {len(self.configurations)}")
-
-        for i, config in enumerate(self.configurations):
-            backup_dir = os.path.join(self.results_dir, config['name'])
-            exists = "✓" if os.path.exists(backup_dir) else "✗"
-            self.log_message(f"  {i + 1}. {config['name']}: {exists}")
-
-        self.log_message("Check individual directories for detailed results.")
-
-    def run_all_simulations(self):
-        """Initialize the sequential simulation process"""
-        self.configurations = self.define_simulation_configurations()
-
-        if not self.configurations:
-            self.log_message("No configurations defined!")
-            return False
-
-        # Start with first configuration
-        success = self.set_current_simulation(0)
-
-        if success:
-            self.log_message("Sequential simulation system initialized.")
-            self.log_message("Metafor will now run the first simulation.")
-
-        return success
-
-
-# Global simulation manager instance
-_simulation_manager = None
-
-
-def get_simulation_manager():
-    """Get or create the global simulation manager"""
-    global _simulation_manager
-    if _simulation_manager is None:
-        _simulation_manager = SimulationManager()
-        _simulation_manager.run_all_simulations()
-    return _simulation_manager
-
-
-# CORRECTED OBSERVER CLASS
-class SequentialSimulationObserver(MetaforObserver):
-    """Observer to handle automatic simulation chaining"""
-
-    def __init__(self):
-        MetaforObserver.__init__(self)
-        self.manager = get_simulation_manager()
-
-    def simulationCompleted(self, metafor):
-        """Called when a simulation completes successfully"""
-        self.manager.log_message(">>> Simulation completed. Processing next simulation...")
-
-        # Mark current simulation as completed and try to advance
-        if self.manager.advance_to_next_simulation():
-            self.manager.log_message(">>> Preparing next simulation...")
-
-            # Important: We need to restart Metafor for the next simulation
-            # This is the critical part that was missing
-            try:
-                # Reset Metafor state
-                metafor.reset()
-
-                # Reload with new configuration
-                new_metafor = getMetafor()
-
-                # Start the new simulation
-                self.manager.log_message(">>> Starting next simulation...")
-                new_metafor.start()
-
-            except Exception as e:
-                self.manager.log_message(f"Error starting next simulation: {e}")
-        else:
-            self.manager.log_message(">>> All simulations completed!")
-
-
-# =============================================================================
-# ORIGINAL CODE (MODIFIED TO WORK WITH SEQUENTIAL MANAGER)
-# =============================================================================
 
 from wrap import *
 from wrap.mtFrequencyAnalysisw import *
+import math
+import multiprocessing
 
-# enable full parallelism
-StrVectorBase.useTBB()
-StrMatrixBase.useTBB()
-ContactInteraction.useTBB()
+print(f"Nombre de cœurs disponibles : {multiprocessing.cpu_count()}")
+print("=" * 60)
+
+# Ajoutez ceci au début de votre script après les imports
+from wrap import Blas
+import os
+
+wrap.StrVectorBase.useTBB()
+wrap.StrMatrixBase.useTBB()
+wrap.ContactInteraction.useTBB()
+wrap.ValuesManager.useTBB()
+
+# =============================================================================
+# CONFIGURATION OPTIMISÉE POUR STABILISATION À 0mm
+# =============================================================================
 
 import numpy as np
 from math import sqrt, pi, cos, sin, atan2
@@ -290,9 +34,9 @@ class BladeConfig:
         self.width_ref = 45.0  # reference width
 
         # Current blade geometry
-        self.thickness = 0.29  # current thickness (e/h)
-        self.length = 105.25  # current length (L)
-        self.width = 25.2  # current width
+        self.thickness = 0.24  # current thickness (e/h)
+        self.length = 101.35 # current length (L)
+        self.width = 45  # current width
 
         # Material selection: 'BE_CU', 'INVAR', 'STEEL'
         self.material = 'BE_CU'
@@ -304,7 +48,7 @@ class BladeConfig:
         # Reference equilibrium parameters
         self.enc_ref = 57.32
 
-        self.Dx_fixe = True  #Set to True for Dx = -67.5227 (experimental value) and False for Dx to be calculated
+        self.Dx_fixe = False  #Set to True for Dx = -67.5227 or -2 * R - 0.52 (experimental value) and False for Dx to be calculated
 
     def get_elements_length(self):
         return int(self.length * self.elements_length_factor)
@@ -327,8 +71,9 @@ class BladeConfig:
         enc_opt = self.enc_ref
 
         if self.Dx_fixe:
-            Dx_opt = -67.5227  # Use fixed Dx value
-            print(f"INFO: Dx_fixe is True. Dx set to fixed value: {Dx_opt}.")
+            Dx_opt = -2 * R -0.52  # Use fixed Dx value
+            #♣Dx_opt = -67.5227  # (experimental value)
+            print(f"INFO: Dx_fixe is True. Calculating Dx = -2 * R - 0.52 = {Dx_opt:.4f} (L={self.length:.2f} mm).")
         else:
             Dx_opt = -2 * R  # Calculate Dx for a semicircle
             print(f"INFO: Dx_fixe is False. Calculating Dx = -2 * R = {Dx_opt:.4f} (L={self.length:.2f} mm).")
@@ -457,14 +202,14 @@ class SimulationConfig:
         self.stabilization_time = 12.0
 
         # Temperature parameters
-        self.enable_thermal = True
+        self.enable_thermal = False
         self.temp_initial_kelvin = 273.15 + 10.0
         self.temp_final_kelvin = 273.15 + 50.0
         self.temp_start_time = 20.0
         self.temp_end_time = 35.0
 
-        # Time step control - NEW FEATURE
-        self.adaptive_timestep = False  # Set to True for adaptive, False for fixed
+        # Time step control
+        self.adaptive_timestep = True  # Set to True for adaptive, False for fixed
 
         # Fixed time step parameters (used when adaptive_timestep = False)
         self.fixed_timestep_size = 0.02  # Fixed time step size
@@ -548,20 +293,11 @@ def setup_temperature_dependent_properties(material):
     return fctE, fctCTE
 
 
-
-# Add this at the beginning of your getMetafor function:
 def getMetafor(d={}):
     """
-    Modified main function to work with sequential simulation manager
+    Optimized main function with physics-based compensation
     """
-    # Get simulation manager and current configuration
-    manager = get_simulation_manager()
 
-    # Override parameters with current simulation configuration
-    current_config = manager.get_current_simulation_config()
-    d.update(current_config)
-
-    # Continue with your original getMetafor code...
     # Initialize configurations with physics-based optimization
     blade_config, sim_config, warnings = setup_optimized_blade_system(d)
 
@@ -683,6 +419,8 @@ def getMetafor(d={}):
     # Spring
     p30 = pointset.define(30, 0.0, -H / 2)
 
+
+
     # Curves and wires (same as original)
     curveset = geometry.getCurveSet()
     # blade
@@ -802,7 +540,7 @@ def getMetafor(d={}):
 
     if sim_config.enable_thermal:
         # to use thermal properties
-        # https://material-properties.org/beryllium-copper-density-strength-hardness-melting-point/#google_vignette
+        #https://material-properties.org/beryllium-copper-density-strength-hardness-melting-point/#google_vignette
         materials.define(1, TmEvpIsoHHypoMaterial)
         if blade_config.material == 'BE_CU':
             materials(1).put(MASS_DENSITY, 8.36e-9)
@@ -854,6 +592,7 @@ def getMetafor(d={}):
 
         materials(1).put(YIELD_NUM, yield_num)
 
+
         materials.define(2, EvpIsoHHypoMaterial)
         materials(2).put(MASS_DENSITY, 8.0415e-9)
         materials(2).put(ELASTIC_MODULUS, 210e3)
@@ -862,7 +601,7 @@ def getMetafor(d={}):
 
     # Spring material
     materials.define(4, ConstantSpringMaterial)
-    materials(4).put(SPRING_FK, 11.7211)  # Rotational stiffness N/mm
+    materials(4).put(SPRING_FK, 11.7211) # Rotational stiffness N/mm
 
     # OPTIMIZED GRAVITY FUNCTION - Smoother loading
     fctG = PieceWiseLinearFunction()
@@ -890,6 +629,7 @@ def getMetafor(d={}):
     prp2.put(THICKNESS, 63.0)
     prp2.put(GRAVITY_Y, -9.81e3)
     prp2.depend(GRAVITY_Y, fctG, Field1D(TM))
+
 
     # Apply properties
     app = FieldApplicator(1)
@@ -943,10 +683,10 @@ def getMetafor(d={}):
 
     # OPTIMIZED LOADING FUNCTIONS - Smoother and faster convergence
     fctX = PieceWiseLinearFunction()
-    fctX.setData(0.0, 0.0)  # Start → 0 move
-    fctX.setData(T_load / 8, 0.0)  # t = 1.25s -> always 0
-    fctX.setData(T_load / 2, Dx / (Dx + Dx1))  # t = 5s -> partial displacement (~1 if Dx1=0)
-    fctX.setData(3 * T_load / 4, 1.0)  # t = 7.5s -> full displacement
+    fctX.setData(0.0, 0.0) # Start → 0 move
+    fctX.setData(T_load / 8, 0.0) # t = 1.25s -> always 0
+    fctX.setData(T_load / 2, Dx / (Dx + Dx1)) # t = 5s -> partial displacement (~1 if Dx1=0)
+    fctX.setData(3 * T_load / 4, 1.0) # t = 7.5s -> full displacement
     fctX.setData(T_load, 1.0)
     fctX.setData(12.0, 1.0)
     fctX.setData(T, 1.0)
@@ -1044,8 +784,7 @@ def getMetafor(d={}):
     # OPTIMIZED TIME INTEGRATION - Key for performance improvement
     if sim_config.enable_thermal:
         # Mechanical time integration - OPTIMIZED for stability
-        tiMech = AlphaGeneralizedTimeIntegration(
-            metafor)  # ----------------------------------------------Line change (quasistatic -> ALPHA)
+        tiMech = AlphaGeneralizedTimeIntegration(metafor)  #----------------------------------------------Line change (quasistatic -> ALPHA)
         # Note: convergence control via iteration handlers rather than setMaxNumberOfLoadIncrements
 
         # Thermal time integration - OPTIMIZED parameters
@@ -1061,6 +800,7 @@ def getMetafor(d={}):
         ti.setMechanicalTimeIntegration(tiMech)
         ti.setThermalTimeIntegration(tiTher)
         metafor.setTimeIntegration(ti)
+
 
         # Thermal iteration manager - OPTIMIZED for convergence
         tim = metafor.getThermalIterationManager()
@@ -1083,22 +823,22 @@ def getMetafor(d={}):
         # ADAPTIVE TIME STEPPING based on simulation phases - ENHANCED
         if sim_config.enable_thermal:
             # Phase 1: Mechanical loading (0 to T_load) - progressive refinement
-            tsm.setNextTime(sim_config.loading_time * 0.25, 12, 0.01)  # Early loading Up to 2.5s
-            tsm.setNextTime(sim_config.loading_time * 0.5, 12, 0.005)  # Mid loading Up to 5s
-            tsm.setNextTime(sim_config.loading_time * 0.75, 25, 0.005)  # Late loading Up to 7.5s
-            tsm.setNextTime(sim_config.loading_time, 25, 0.005)  # Final mechanical phase Up to 10s
+            tsm.setNextTime(sim_config.loading_time * 0.25, 6, 0.01)  # Early loading Up to 2.5s
+            tsm.setNextTime(sim_config.loading_time * 0.5, 6, 0.005)  # Mid loading Up to 5s
+            tsm.setNextTime(sim_config.loading_time * 0.75, 12, 0.005)  # Late loading Up to 7.5s
+            tsm.setNextTime(sim_config.loading_time, 13, 0.005)  # Final mechanical phase Up to 10s
 
             # Phase 2: Stabilization (T_load to temp_start_time) - MUCH SMALLER STEPS
-            tsm.setNextTime(sim_config.loading_time + 1.0, 10, 0.01)  # First second after loading Up to 11s
-            tsm.setNextTime(sim_config.loading_time + 2.5, 15, 0.02)  # Intermediate stabilization Up to 12.5s
-            tsm.setNextTime(sim_config.temp_start_time - 2.0, 11, 0.05)  # Pre-thermal Up to 18s
-            tsm.setNextTime(sim_config.temp_start_time, 4, 0.05)  # Just before thermal Up to 20s
+            tsm.setNextTime(sim_config.loading_time + 1.0, 5, 0.01)  # First second after loading Up to 11s
+            tsm.setNextTime(sim_config.loading_time + 2.5, 7, 0.02)  # Intermediate stabilization Up to 12.5s
+            tsm.setNextTime(sim_config.temp_start_time - 2.0, 5, 0.05)  # Pre-thermal Up to 18s
+            tsm.setNextTime(sim_config.temp_start_time, 2, 0.05)  # Just before thermal Up to 20s
 
             # Phase 3: Thermal loading (temp_start_time to temp_end_time) - adaptive steps
             thermal_duration = sim_config.temp_end_time - sim_config.temp_start_time
             tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.1, 3, 0.05)  # Thermal start Up to 21.5s
-            tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.5, 12, 0.05)  # Mid thermal Up to 27.5s
-            tsm.setNextTime(sim_config.temp_end_time, 37, 0.02)  # End thermal - finest steps Up to 35s
+            tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.5, 6, 0.05)  # Mid thermal Up to 27.5s
+            tsm.setNextTime(sim_config.temp_end_time, 18, 0.02)  # End thermal - finest steps Up to 35s
 
             # Phase 4: Final phase - can use larger steps again
             if sim_config.temp_end_time < sim_config.final_time:
@@ -1106,9 +846,9 @@ def getMetafor(d={}):
 
         else:
             # Pure mechanical - simpler time stepping
-            tsm.setNextTime(sim_config.loading_time * 0.5, 25, 0.01)
-            tsm.setNextTime(sim_config.loading_time, 50, 0.005)
-            tsm.setNextTime(sim_config.final_time, 40, 0.05)
+            tsm.setNextTime(sim_config.loading_time * 0.5, 13, 0.01) # Up to 5s
+            tsm.setNextTime(sim_config.loading_time, 25, 0.005) # Up to 10s
+            tsm.setNextTime(sim_config.final_time, 20, 0.05) # Up to 30s
 
     else:
         print(f"INFO: Using FIXED time stepping with dt = {sim_config.fixed_timestep_size}.")
@@ -1138,17 +878,16 @@ def getMetafor(d={}):
 
     # MECHANICAL ITERATION MANAGER - OPTIMIZED with compatibility management
     mim = metafor.getMechanicalIterationManager()
-    mim.setResidualComputationMethod(
-        Method4ResidualComputation())  # ----------------------------------------------Line added
+    mim.setResidualComputationMethod(Method4ResidualComputation()) #----------------------------------------------Line added
     # Stricter parameters for plasticity
     # ENHANCED CONVERGENCE CONTROL for critical phases
     fct_MaxIter = PieceWiseLinearFunction()
     fct_MaxIter.setData(0.0, 25.0)  # Standard for the start
-    fct_MaxIter.setData(sim_config.loading_time * 0.75, 35.0)  # More iterations until the end loading
-    fct_MaxIter.setData(sim_config.loading_time, 40.0)  # Max for transition
-    fct_MaxIter.setData(sim_config.loading_time + 2.5, 35.0)  # Critical stabilization
-    fct_MaxIter.setData(sim_config.temp_start_time, 30.0)  # Normal return before thermal
-    fct_MaxIter.setData(sim_config.temp_end_time, 40.0)  # Max pendant thermal
+    fct_MaxIter.setData(sim_config.loading_time * 0.75, 35.0) # More iterations until the end loading
+    fct_MaxIter.setData(sim_config.loading_time, 40.0) # Max for transition
+    fct_MaxIter.setData(sim_config.loading_time + 2.5, 35.0) # Critical stabilization
+    fct_MaxIter.setData(sim_config.temp_start_time, 30.0) # Normal return before thermal
+    fct_MaxIter.setData(sim_config.temp_end_time, 40.0) # Max pendant thermal
     fct_MaxIter.setData(sim_config.final_time, 25.0)  # Standard until the end
 
     # Apply adaptive iteration control
@@ -1266,17 +1005,17 @@ def getMetafor(d={}):
         # Validation of extractors
         # Plastic strain extractors to monitor plasticity
         if sim_config.enable_thermal:
-            hcurves.add(25, IFNodalValueExtractor(interactionset(1), IF_EPL), MaxOperator(),
-                        'max_plastic_strain_blade')
-            hcurves.add(26, IFNodalValueExtractor(interactionset(1), IF_CRITERION), MaxOperator(),
-                        'max_yield_function_blade')
-            hcurves.add(27, IFNodalValueExtractor(interactionset(2), IF_EPL), MaxOperator(),
-                        'max_plastic_strain_structure')
-            max_extractor = 27
+           hcurves.add(25, IFNodalValueExtractor(interactionset(1), IF_EPL), MaxOperator(),
+                       'max_plastic_strain_blade')
+           hcurves.add(26, IFNodalValueExtractor(interactionset(1), IF_CRITERION), MaxOperator(),
+                       'max_yield_function_blade')
+           hcurves.add(27, IFNodalValueExtractor(interactionset(2), IF_EPL), MaxOperator(),
+                       'max_plastic_strain_structure')
+           max_extractor = 27
         else:
-            max_extractor = 14
+           max_extractor = 14
 
-        # If only elastic , use those :
+        #If only elastic , use those :
         # max_extractor = 24 if sim_config.enable_thermal else 14
 
         for i in range(1, max_extractor + 1):
@@ -1361,27 +1100,21 @@ def getMetafor(d={}):
             print("Warning: Visualization not available")
             pass
 
-    # CRITICAL: Add the observer to handle automatic chaining
-    if not manager.simulation_active:
-        observer = SequentialSimulationObserver()
-        metafor.addObserver(observer)
-        manager.simulation_active = True
-        manager.log_message("Sequential simulation observer attached.")
-
-    return metafor  # Your existing return
+    return metafor
 
 
 
-# Modified postpro function to handle sequential processing
+
+
+# ----------------------------------------------------------------------------------
+# OPTIMIZED Modal analysis with thermal effects consideration
+from toolbox.utilities import *
+
+
 def postpro():
     """
-    Enhanced post-processing for sequential simulations
+    Enhanced post-processing for thermal-mechanical analysis
     """
-    manager = get_simulation_manager()
-    current_config_name = manager.configurations[manager.current_config_index]['name']
-
-    manager.log_message(f"\n=== POST-PROCESSING: {current_config_name} ===")
-
     import os.path
     # Working directory
     setDir('workspace/%s' % os.path.splitext(os.path.basename(__file__))[0])
@@ -1496,25 +1229,195 @@ def postpro():
         print('3. Numerical conditioning issues')
         print('4. Missing math import (add: import math at the top)')
 
-    # After postprocessing, handle simulation completion
-    continue_simulations = handle_simulation_completion()
 
-    if continue_simulations:
-        manager.log_message("Next simulation will start automatically...")
-    else:
-        manager.log_message("All simulations completed. Check results directory for analysis.")
+# Alternative simpler version (closer to your working code):
+def postpro_simple():
+    """
+    Simplified version similar to your working code but with thermal state loading
+    """
+    import os.path
+    import math  # Make sure math is imported
+
+    setDir('workspace/%s' % os.path.splitext(os.path.basename(__file__))[0])
+    load(__name__)
+
+    p = {}
+    p['postpro'] = True
+    metafor = instance(p)
+    domain = metafor.getDomain()
+
+    # Load the last archive (thermal state)
+    loader = fac.FacManager(metafor)
+    loader.load()
+
+    # Set up curves
+    curves = metafor.getValuesManager()
+
+    # Configure Lanczos analysis
+    lanczos = LanczosFrequencyAnalysisMethod(domain)
+    lanczos.setNumberOfEigenValues(8)  # More modes for better analysis
+    lanczos.setSpectralShifting(0.0)
+    lanczos.setComputeEigenVectors(True)
+    lanczos.setWriteMatrix2Matlab(True)
+
+    print('\n=== Modal Analysis on Thermal State ===')
+    print('Computing Eigenvalues...')
+
+    # Execute analysis
+    lanczos.execute()
+    lanczos.writeTSC()
+
+    # Add to curves
+    curves.add(11, FrequencyAnalysisValueExtractor(lanczos), 'freqs_thermal')
+
+    # Fill and save
+    curves.fillNow(metafor.getCurrentStepNo())
+    curves.toAscii()
+    curves.flush()
+
+    # Display results
+    print('\n--- Results ---')
+    for i in range(min(8, lanczos.getNumberOfEigenValues())):
+        eigenval = lanczos.getEigenValue(i)
+        if eigenval > 0:
+            frequency_hz = eigenval  # eigenval is actually frequency in Hz
+            true_eigenvalue = (2 * math.pi * frequency_hz) ** 2  # Calculate true eigenvalue
+            print(f'Mode {i + 1}: Frequency = {frequency_hz:.4f} Hz, True Eigenvalue = {true_eigenvalue:.6e}')
+
+            if i == 0:  # First mode comparison
+                expected = 2.91
+                error = abs(frequency_hz - expected) / expected * 100
+                print(f'  (Expected ~{expected} Hz, Error: {error:.1f}%)')
+        else:
+            print(f'Mode {i + 1}: Invalid eigenvalue = {eigenval:.6e}')
+
+    # Read and verify saved file
+    try:
+        with open('freqs_thermal.ascii') as f:
+            txt = f.readlines()
+        frequencies = [float(v) for v in txt[0].strip().split()]
+        true_eigenvalues = [(2 * math.pi * f) ** 2 for f in frequencies]
+        print(f'\nSaved frequencies: {[f"{f:.4f} Hz" for f in frequencies[:5]]}')
+        print(f'True eigenvalues: {[f"{ev:.6e}" for ev in true_eigenvalues[:5]]}')
+    except Exception as e:
+        print(f'Could not read output file: {e}')
+
+
+# Visualization version (if you want to see mode shapes)
+def postpro_with_viz():
+    """
+    Version with visualization like your original working code
+    """
+    import os.path
+    import math
+
+    setDir('workspace/%s' % os.path.splitext(os.path.basename(__file__))[0])
+    load(__name__)
+
+    p = {}
+    p['postpro'] = True
+    metafor = instance(p)
+    domain = metafor.getDomain()
+
+    # Load thermal state
+    loader = fac.FacManager(metafor)
+    loader.load()
+
+    curves = metafor.getValuesManager()
+
+    lanczos = LanczosFrequencyAnalysisMethod(domain)
+    lanczos.setNumberOfEigenValues(8)
+    lanczos.setSpectralShifting(0.0)
+    lanczos.setComputeEigenVectors(True)
+    lanczos.setWriteMatrix2Matlab(True)
+
+    lanczos.execute()
+    lanczos.writeTSC()
+    curves.add(11, FrequencyAnalysisValueExtractor(lanczos), 'freqs_thermal_viz')
+
+    curves.fillNow(metafor.getCurrentStepNo())
+    curves.toAscii()
+    curves.flush()
+
+    # Visualization setup
+    win = VizWin()
+    for i in range(domain.getInteractionSet().size()):
+        win.add(domain.getInteractionSet().getInteraction(i))
+
+    # Show each mode
+    for i in range(min(3, lanczos.getNumberOfEigenValues())):
+        eigenval = lanczos.getEigenValue(i)
+        if eigenval > 0:
+            frequency_hz = eigenval  # eigenval is actually frequency in Hz
+            true_eigenvalue = (2 * math.pi * frequency_hz) ** 2  # Calculate true eigenvalue
+            lanczos.showEigenVector(i)
+            win.update()
+            print(f'Eigen Vector {i}, Frequency = {frequency_hz:.4f} Hz, True Eigenvalue = {true_eigenvalue:.6e}')
+            input("Press enter to continue to next mode...")
+        else:
+            print(f'Skipping mode {i}: invalid eigenvalue = {eigenval:.6e}')
+
+    # Final results
+    with open('freqs_thermal_viz.ascii') as f:
+        txt = f.readlines()
+    frequencies = [float(v) for v in txt[0].strip().split()]
+    true_eigenvalues = [(2 * math.pi * f) ** 2 for f in frequencies]
+    print(f'\nFinal frequencies = {frequencies[:5]}')
+    print(f'Final true eigenvalues = {true_eigenvalues[:5]}')
+
+def postpro_initial():
+    import os.path
+    setDir('workspace/%s' % os.path.splitext(os.path.basename(__file__))[0])
+    load(__name__)
+
+    p = {}
+    p['postpro'] = True
+    metafor = instance(p)
+    domain = metafor.getDomain()
+
+    # set new curves
+    curves = metafor.getValuesManager()
+
+    lanczos = LanczosFrequencyAnalysisMethod(domain)
+    lanczos.setNumberOfEigenValues(3)
+    lanczos.setSpectralShifting(0.0)
+    lanczos.setComputeEigenVectors(True)
+    lanczos.setWriteMatrix2Matlab(True)
+
+    # load the last archive
+    loader = fac.FacManager(metafor)
+    loader.load()
+
+    lanczos.execute()
+    lanczos.writeTSC()
+    fExtr = FrequencyAnalysisValueExtractor(lanczos)
+    curves.add(11, FrequencyAnalysisValueExtractor(lanczos), 'freqs')
+
+    # extraction
+    print('\nComputing Eigenvalues...')
+    curves.fillNow(metafor.getCurrentStepNo())
+    curves.toAscii()
+    curves.flush()
+
+    win = VizWin()
+    for i in range(domain.getInteractionSet().size()):
+        win.add(domain.getInteractionSet().getInteraction(i))
+    for i in range(3):
+        lanczos.showEigenVector(i)
+        win.update()
+        print('Eigen Vector ', i, 'EigenValue = ', lanczos.getEigenValue(i))
+        input("press enter to continue")
+
+    with open('freqs.ascii') as f:
+        txt = f.readlines()
+
+    print(f'eigenvalues = {[float(v) for v in txt[0].strip().split()]}')
 
 
 def additional_diagnostics():
-    """
-    Enhanced diagnostics with simulation manager integration
-    """
-    manager = get_simulation_manager()
-    current_config = manager.configurations[manager.current_config_index]
-
-    manager.log_message(f"\n=== DIAGNOSTICS: {current_config['name']} ===")
-
+    """Additional diagnostics to verify thermal condition with comprehensive analysis"""
     import os
+    import numpy as np
 
     print('\n=== THERMAL STATE DIAGNOSTICS ===')
 
@@ -1607,13 +1510,13 @@ def additional_diagnostics():
 
             if values:
                 # Convert to Celsius
-                initial_C = values[0] - 273.15
-                final_C = values[-1] - 273.15
+                initial_C = values[0] + 273.15
+                final_C = values[-1] + 273.15
                 delta_T = final_C - initial_C
 
                 print(f"{temp_type}:")
-                print(f"  Initial: {initial_C:.1f}°C ({values[0]:.1f}K)")
-                print(f"  Final: {final_C:.1f}°C ({values[-1]:.1f}K)")
+                print(f"  Initial: {initial_C:.1f}°C ({values[0]:.1f}C)")
+                print(f"  Final: {final_C:.1f}°C ({values[-1]:.1f}C)")
                 print(f"  Change: ΔT = {delta_T:.1f}°C")
 
     # Thermal strain analysis
@@ -1811,36 +1714,14 @@ def additional_diagnostics():
     print(f"gravitational wave detection sensitivity.")
     print('=' * 60)
 
-    manager.log_message("Diagnostics completed for current simulation")
-
-if __name__ == '__main__':
-    get_simulation_manager().run_all_simulations()
 
 
-# Usage instructions for integration:
-"""
-INTEGRATION INSTRUCTIONS:
+if __name__ == "__main__":
+    # Main analysis : Only one at a time
+    postpro()
+    #postpro_simple() # Initial way to obtain the modal analysis
+    #postpro_with_viz() # Modal analysys with graphs
+    #postpro_initial() #Post pro of morgan code
 
-1. Replace your existing getMetafor function with the modified version above
-2. The system will automatically:
-   - Run the first simulation when you "Load" and "Start time integration"
-   - Save results after each simulation
-   - Clean workspace for next simulation  
-   - Continue with next configuration
-   - Generate comparison report when all done
+    additional_diagnostics()
 
-3. For postprocessing, run postpro() ONCE after ALL simulations are complete
-   - The system will process each configuration's results automatically
-
-4. Directory structure will be:
-   AutomatedResults/
-   ├── BeCu_Baseline_Thermal/          (backup of workspace)
-   ├── BeCu_Mechanical_Only/           (backup of workspace)  
-   ├── INVAR_Thermal_Comparison/       (backup of workspace)
-   ├── BeCu_Thick_Variation/           (backup of workspace)
-   ├── BeCu_Width_Variation/           (backup of workspace)
-   ├── comparison_report.txt           (summary of all results)
-   └── simulation_log_YYYYMMDD_HHMMSS.txt (detailed log)
-
-5. Each backup directory contains all .ascii files and resFiles.txt from that simulation
-"""

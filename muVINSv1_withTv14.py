@@ -1,280 +1,29 @@
-# AUTOMATED SEQUENTIAL SIMULATION SYSTEM
-#muVINSv1_withTv11 but multiple one after another : Goal is to make the programm turn multiple configuration by itself during a night or spare time.
-#Can't manage to make it work: abandoned project for now
+# Ultra-high performance inertial sensor for gravitational waves detection
 
-import os
-import shutil
-import time
-from datetime import datetime
-from wrap import *
+# Study of the muVINS with configurable blade parameters , thermal settings, time step and others
+# To change parameters, use the def __init__ in the BladeConfig and the SimulationConfig
+
+# Adrien Pierrat based on the code of Morgane Zeoli
 
 
-class SimulationManager:
-    """Manages sequential execution of multiple Metafor simulations"""
+# -*- coding: Windows CP1252 -*-
 
-    def __init__(self, base_output_dir=None):
-        # Paths based on your system
-        self.script_path = r"C:\Users\adpie\Desktop\Stage 4A\Metafor\muVINSv1_withTv12.py"
-        self.base_workspace = r"C:\Users\adpie\Desktop\Stage 4A\Metafor\workspace\muVINSv1_withTv12"
-
-        # Results storage
-        if base_output_dir is None:
-            base_output_dir = r"C:\Users\adpie\Desktop\Stage 4A\Metafor\AutomatedResults"
-        self.results_dir = base_output_dir
-
-        # Create results directory
-        os.makedirs(self.results_dir, exist_ok=True)
-
-        # Log file
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.log_file = os.path.join(self.results_dir, f"simulation_log_{timestamp}.txt")
-
-        # Storage for results analysis
-        self.simulation_results = {}
-        self.current_config_index = 0
-        self.configurations = []
-        self.simulation_active = False
-
-        self.log_message("=== AUTOMATED SEQUENTIAL SIMULATION SYSTEM INITIALIZED ===")
-        self.log_message(f"Results directory: {self.results_dir}")
-        self.log_message(f"Log file: {self.log_file}")
-
-    def log_message(self, message, also_print=True):
-        """Log message to file and optionally print"""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_line = f"[{timestamp}] {message}"
-
-        with open(self.log_file, 'a', encoding='utf-8') as f:
-            f.write(log_line + "\n")
-
-        if also_print:
-            print(log_line)
-
-    def define_simulation_configurations(self):
-        """Define all simulation configurations to run"""
-        configurations = []
-
-        # Configuration 1: Baseline Be-Cu with thermal effects
-        config1 = {
-            'name': 'BeCu_Baseline_Thermal',
-            'description': 'Beryllium-Copper blade with thermal loading (10°C → 50°C)',
-            'parameters': {
-                'blade_material': 'BE_CU',
-                'blade_thickness': 0.24,
-                'blade_length': 105.25,
-                'blade_width': 45.0,
-                'enable_thermal': True,
-                'final_time': 3.0,
-                'loading_time': 10.0
-            }
-        }
-
-        # Configuration 2: Be-Cu without thermal effects (mechanical only)
-        config2 = {
-            'name': 'BeCu_Mechanical_Only',
-            'description': 'Beryllium-Copper blade - mechanical loading only',
-            'parameters': {
-                'blade_material': 'BE_CU',
-                'blade_thickness': 0.24,
-                'blade_length': 105.25,
-                'blade_width': 45.0,
-                'enable_thermal': False,
-                'final_time': 3.0,
-                'loading_time': 10.0
-            }
-        }
-
-        configurations.extend([config1, config2])
-
-        self.log_message(f"Defined {len(configurations)} simulation configurations:")
-        for i, config in enumerate(configurations, 1):
-            self.log_message(f"  {i}. {config['name']}: {config['description']}")
-
-        return configurations
-
-    def get_current_simulation_config(self):
-        """Get the current simulation configuration"""
-        if hasattr(self, '_current_override_params'):
-            return self._current_override_params
-        return {}
-
-    def set_current_simulation(self, config_index):
-        """Set which simulation configuration to run"""
-        if 0 <= config_index < len(self.configurations):
-            self.current_config_index = config_index
-            config = self.configurations[config_index]
-            self._current_override_params = config['parameters']
-
-            self.log_message(f"=== STARTING SIMULATION {config_index + 1}/{len(self.configurations)} ===")
-            self.log_message(f"Configuration: {config['name']}")
-            self.log_message(f"Description: {config['description']}")
-            self.log_message(f"Parameters: {config['parameters']}")
-
-            return True
-        return False
-
-    def backup_current_workspace(self, config_name):
-        """Backup the current workspace to preserve results"""
-        if not os.path.exists(self.base_workspace):
-            self.log_message(f"Warning: Workspace {self.base_workspace} does not exist")
-            return None
-
-        # Create backup directory
-        backup_dir = os.path.join(self.results_dir, config_name)
-
-        try:
-            # Remove existing backup if present
-            if os.path.exists(backup_dir):
-                shutil.rmtree(backup_dir)
-
-            # Copy entire workspace
-            shutil.copytree(self.base_workspace, backup_dir)
-            self.log_message(f"Workspace backed up to: {backup_dir}")
-
-            return backup_dir
-
-        except Exception as e:
-            self.log_message(f"Error backing up workspace: {e}")
-            return None
-
-    def clean_workspace_for_next_simulation(self):
-        """Clean workspace for next simulation while preserving essential files"""
-        try:
-            if os.path.exists(self.base_workspace):
-                # Remove result files but keep configuration files
-                for filename in os.listdir(self.base_workspace):
-                    filepath = os.path.join(self.base_workspace, filename)
-                    if filename.endswith('.v') or filename.endswith('.ascii') or filename == 'resFiles.txt':
-                        if os.path.isfile(filepath):
-                            os.remove(filepath)
-                            self.log_message(f"Removed: {filename}")
-
-                self.log_message("Workspace cleaned for next simulation")
-
-        except Exception as e:
-            self.log_message(f"Warning: Could not clean workspace: {e}")
-
-    def has_next_simulation(self):
-        """Check if there are more simulations to run"""
-        return self.current_config_index + 1 < len(self.configurations)
-
-    def advance_to_next_simulation(self):
-        """Advance to the next simulation configuration"""
-        current_config = self.configurations[self.current_config_index]
-
-        self.log_message(f"=== SIMULATION {self.current_config_index + 1} COMPLETED ===")
-
-        # Backup current results
-        backup_dir = self.backup_current_workspace(current_config['name'])
-
-        # Clean workspace for next simulation
-        self.clean_workspace_for_next_simulation()
-
-        # Move to next configuration
-        self.current_config_index += 1
-
-        if self.has_next_simulation():
-            # Set up next simulation
-            self.set_current_simulation(self.current_config_index)
-            self.simulation_active = False  # Reset for next simulation
-            return True
-        else:
-            # All simulations completed
-            self.log_message("\n=== ALL SIMULATIONS COMPLETED ===")
-            self.generate_comparison_report()
-            return False
-
-    def generate_comparison_report(self):
-        """Generate a simple completion report"""
-        self.log_message("\n" + "=" * 80)
-        self.log_message("SIMULATION SEQUENCE COMPLETED")
-        self.log_message("=" * 80)
-        self.log_message(f"Total simulations run: {len(self.configurations)}")
-
-        for i, config in enumerate(self.configurations):
-            backup_dir = os.path.join(self.results_dir, config['name'])
-            exists = "✓" if os.path.exists(backup_dir) else "✗"
-            self.log_message(f"  {i + 1}. {config['name']}: {exists}")
-
-        self.log_message("Check individual directories for detailed results.")
-
-    def run_all_simulations(self):
-        """Initialize the sequential simulation process"""
-        self.configurations = self.define_simulation_configurations()
-
-        if not self.configurations:
-            self.log_message("No configurations defined!")
-            return False
-
-        # Start with first configuration
-        success = self.set_current_simulation(0)
-
-        if success:
-            self.log_message("Sequential simulation system initialized.")
-            self.log_message("Metafor will now run the first simulation.")
-
-        return success
-
-
-# Global simulation manager instance
-_simulation_manager = None
-
-
-def get_simulation_manager():
-    """Get or create the global simulation manager"""
-    global _simulation_manager
-    if _simulation_manager is None:
-        _simulation_manager = SimulationManager()
-        _simulation_manager.run_all_simulations()
-    return _simulation_manager
-
-
-# CORRECTED OBSERVER CLASS
-class SequentialSimulationObserver(MetaforObserver):
-    """Observer to handle automatic simulation chaining"""
-
-    def __init__(self):
-        MetaforObserver.__init__(self)
-        self.manager = get_simulation_manager()
-
-    def simulationCompleted(self, metafor):
-        """Called when a simulation completes successfully"""
-        self.manager.log_message(">>> Simulation completed. Processing next simulation...")
-
-        # Mark current simulation as completed and try to advance
-        if self.manager.advance_to_next_simulation():
-            self.manager.log_message(">>> Preparing next simulation...")
-
-            # Important: We need to restart Metafor for the next simulation
-            # This is the critical part that was missing
-            try:
-                # Reset Metafor state
-                metafor.reset()
-
-                # Reload with new configuration
-                new_metafor = getMetafor()
-
-                # Start the new simulation
-                self.manager.log_message(">>> Starting next simulation...")
-                new_metafor.start()
-
-            except Exception as e:
-                self.manager.log_message(f"Error starting next simulation: {e}")
-        else:
-            self.manager.log_message(">>> All simulations completed!")
-
-
-# =============================================================================
-# ORIGINAL CODE (MODIFIED TO WORK WITH SEQUENTIAL MANAGER)
-# =============================================================================
+import multiprocessing
+print(f"Nombre de cœurs disponibles : {multiprocessing.cpu_count()}")
 
 from wrap import *
 from wrap.mtFrequencyAnalysisw import *
+import math
 
 # enable full parallelism
-StrVectorBase.useTBB()
-StrMatrixBase.useTBB()
-ContactInteraction.useTBB()
+StrVectorBase.useTBB(True)
+StrMatrixBase.useTBB(True)
+ContactInteraction.useTBB(True)
+
+
+# =============================================================================
+# CONFIGURATION OPTIMISÉE POUR STABILISATION À 0mm
+# =============================================================================
 
 import numpy as np
 from math import sqrt, pi, cos, sin, atan2
@@ -290,21 +39,21 @@ class BladeConfig:
         self.width_ref = 45.0  # reference width
 
         # Current blade geometry
-        self.thickness = 0.29  # current thickness (e/h)
-        self.length = 105.25  # current length (L)
-        self.width = 25.2  # current width
+        self.thickness = 0.22  # current thickness (e/h)
+        self.length = 104.9 # current length (L)
+        self.width = 60.0  # current width
 
         # Material selection: 'BE_CU', 'INVAR', 'STEEL'
-        self.material = 'BE_CU'
+        self.material = 'INVAR'
 
         # Mesh parameters for blade - use your existing values
         self.elements_thickness = 8  # elements through thickness (ne)
-        self.elements_length_factor = 20  # nL = L * this factor
+        self.elements_length_factor = 20  # nL = L * this factors
 
         # Reference equilibrium parameters
         self.enc_ref = 57.32
 
-        self.Dx_fixe = True  #Set to True for Dx = -67.5227 (experimental value) and False for Dx to be calculated
+        self.Dx_fixe = False  #Set to True for Dx = -67.5227 or -2 * R - 0.52 (experimental value) and False for Dx to be calculated
 
     def get_elements_length(self):
         return int(self.length * self.elements_length_factor)
@@ -327,8 +76,9 @@ class BladeConfig:
         enc_opt = self.enc_ref
 
         if self.Dx_fixe:
-            Dx_opt = -67.5227  # Use fixed Dx value
-            print(f"INFO: Dx_fixe is True. Dx set to fixed value: {Dx_opt}.")
+            Dx_opt = -2 * R -0.52  # Use fixed Dx value
+            # Dx_opt = -67.5227  # (experimental value)
+            print(f"INFO: Dx_fixe is True. Calculating Dx = -2 * R - 0.52 = {Dx_opt:.4f} (L={self.length:.2f} mm).")
         else:
             Dx_opt = -2 * R  # Calculate Dx for a semicircle
             print(f"INFO: Dx_fixe is False. Calculating Dx = -2 * R = {Dx_opt:.4f} (L={self.length:.2f} mm).")
@@ -457,14 +207,19 @@ class SimulationConfig:
         self.stabilization_time = 12.0
 
         # Temperature parameters
-        self.enable_thermal = True
+        self.enable_thermal = False
         self.temp_initial_kelvin = 273.15 + 10.0
         self.temp_final_kelvin = 273.15 + 50.0
         self.temp_start_time = 20.0
         self.temp_end_time = 35.0
 
-        # Time step control - NEW FEATURE
-        self.adaptive_timestep = False  # Set to True for adaptive, False for fixed
+        # Plasticity plots and data
+        self.enable_plasticityData = True  # If True then all the plasticity data will be calculated in the simulation.
+        # Else only the elastic data will be calculated. Improve the simulation time if put to False
+        # /!\ Advice put True for Invar and False for Be-Cu.
+
+        # Time step control
+        self.adaptive_timestep = True  # Set to True for adaptive, False for fixed
 
         # Fixed time step parameters (used when adaptive_timestep = False)
         self.fixed_timestep_size = 0.02  # Fixed time step size
@@ -548,20 +303,11 @@ def setup_temperature_dependent_properties(material):
     return fctE, fctCTE
 
 
-
-# Add this at the beginning of your getMetafor function:
 def getMetafor(d={}):
     """
-    Modified main function to work with sequential simulation manager
+    Optimized main function with physics-based compensation
     """
-    # Get simulation manager and current configuration
-    manager = get_simulation_manager()
 
-    # Override parameters with current simulation configuration
-    current_config = manager.get_current_simulation_config()
-    d.update(current_config)
-
-    # Continue with your original getMetafor code...
     # Initialize configurations with physics-based optimization
     blade_config, sim_config, warnings = setup_optimized_blade_system(d)
 
@@ -683,6 +429,8 @@ def getMetafor(d={}):
     # Spring
     p30 = pointset.define(30, 0.0, -H / 2)
 
+
+
     # Curves and wires (same as original)
     curveset = geometry.getCurveSet()
     # blade
@@ -782,8 +530,8 @@ def getMetafor(d={}):
     # Elastoplastic behavior laws according to the chosen material
     if blade_config.material == 'BE_CU':
         laws.define(1, LinearIsotropicHardening)
-        laws(1).put(IH_SIGEL, 1000.0)  # Limite elastique approximative pour Be-Cu
-        laws(1).put(IH_H, 1000.0)  # Module d'ecrouissage Be-Cu
+        laws(1).put(IH_SIGEL, 1000.0)  # pproximate elastic limit for BE-CU (~1000 MPa)
+        laws(1).put(IH_H, 1000.0)  # Hardening modulus BE-CU (moderate value)
         yield_num = 1
     elif blade_config.material == 'INVAR':
         laws.define(2, LinearIsotropicHardening)
@@ -802,7 +550,7 @@ def getMetafor(d={}):
 
     if sim_config.enable_thermal:
         # to use thermal properties
-        # https://material-properties.org/beryllium-copper-density-strength-hardness-melting-point/#google_vignette
+        #https://material-properties.org/beryllium-copper-density-strength-hardness-melting-point/#google_vignette
         materials.define(1, TmEvpIsoHHypoMaterial)
         if blade_config.material == 'BE_CU':
             materials(1).put(MASS_DENSITY, 8.36e-9)
@@ -854,6 +602,7 @@ def getMetafor(d={}):
 
         materials(1).put(YIELD_NUM, yield_num)
 
+
         materials.define(2, EvpIsoHHypoMaterial)
         materials(2).put(MASS_DENSITY, 8.0415e-9)
         materials(2).put(ELASTIC_MODULUS, 210e3)
@@ -862,7 +611,7 @@ def getMetafor(d={}):
 
     # Spring material
     materials.define(4, ConstantSpringMaterial)
-    materials(4).put(SPRING_FK, 11.7211)  # Rotational stiffness N/mm
+    materials(4).put(SPRING_FK, 11.7211) # Rotational stiffness N/mm
 
     # OPTIMIZED GRAVITY FUNCTION - Smoother loading
     fctG = PieceWiseLinearFunction()
@@ -890,6 +639,7 @@ def getMetafor(d={}):
     prp2.put(THICKNESS, 63.0)
     prp2.put(GRAVITY_Y, -9.81e3)
     prp2.depend(GRAVITY_Y, fctG, Field1D(TM))
+
 
     # Apply properties
     app = FieldApplicator(1)
@@ -943,10 +693,10 @@ def getMetafor(d={}):
 
     # OPTIMIZED LOADING FUNCTIONS - Smoother and faster convergence
     fctX = PieceWiseLinearFunction()
-    fctX.setData(0.0, 0.0)  # Start → 0 move
-    fctX.setData(T_load / 8, 0.0)  # t = 1.25s -> always 0
-    fctX.setData(T_load / 2, Dx / (Dx + Dx1))  # t = 5s -> partial displacement (~1 if Dx1=0)
-    fctX.setData(3 * T_load / 4, 1.0)  # t = 7.5s -> full displacement
+    fctX.setData(0.0, 0.0) # Start → 0 move
+    fctX.setData(T_load / 8, 0.0) # t = 1.25s -> always 0
+    fctX.setData(T_load / 2, Dx / (Dx + Dx1)) # t = 5s -> partial displacement (~1 if Dx1=0)
+    fctX.setData(3 * T_load / 4, 1.0) # t = 7.5s -> full displacement
     fctX.setData(T_load, 1.0)
     fctX.setData(12.0, 1.0)
     fctX.setData(T, 1.0)
@@ -1044,8 +794,7 @@ def getMetafor(d={}):
     # OPTIMIZED TIME INTEGRATION - Key for performance improvement
     if sim_config.enable_thermal:
         # Mechanical time integration - OPTIMIZED for stability
-        tiMech = AlphaGeneralizedTimeIntegration(
-            metafor)  # ----------------------------------------------Line change (quasistatic -> ALPHA)
+        tiMech = AlphaGeneralizedTimeIntegration(metafor)  #----------------------------------------------Line change (quasistatic -> ALPHA)
         # Note: convergence control via iteration handlers rather than setMaxNumberOfLoadIncrements
 
         # Thermal time integration - OPTIMIZED parameters
@@ -1061,6 +810,7 @@ def getMetafor(d={}):
         ti.setMechanicalTimeIntegration(tiMech)
         ti.setThermalTimeIntegration(tiTher)
         metafor.setTimeIntegration(ti)
+
 
         # Thermal iteration manager - OPTIMIZED for convergence
         tim = metafor.getThermalIterationManager()
@@ -1083,22 +833,22 @@ def getMetafor(d={}):
         # ADAPTIVE TIME STEPPING based on simulation phases - ENHANCED
         if sim_config.enable_thermal:
             # Phase 1: Mechanical loading (0 to T_load) - progressive refinement
-            tsm.setNextTime(sim_config.loading_time * 0.25, 12, 0.01)  # Early loading Up to 2.5s
-            tsm.setNextTime(sim_config.loading_time * 0.5, 12, 0.005)  # Mid loading Up to 5s
-            tsm.setNextTime(sim_config.loading_time * 0.75, 25, 0.005)  # Late loading Up to 7.5s
-            tsm.setNextTime(sim_config.loading_time, 25, 0.005)  # Final mechanical phase Up to 10s
+            tsm.setNextTime(sim_config.loading_time * 0.25, 6, 0.01)  # Early loading Up to 2.5s
+            tsm.setNextTime(sim_config.loading_time * 0.5, 6, 0.005)  # Mid loading Up to 5s
+            tsm.setNextTime(sim_config.loading_time * 0.75, 12, 0.005)  # Late loading Up to 7.5s
+            tsm.setNextTime(sim_config.loading_time, 13, 0.005)  # Final mechanical phase Up to 10s
 
             # Phase 2: Stabilization (T_load to temp_start_time) - MUCH SMALLER STEPS
-            tsm.setNextTime(sim_config.loading_time + 1.0, 10, 0.01)  # First second after loading Up to 11s
-            tsm.setNextTime(sim_config.loading_time + 2.5, 15, 0.02)  # Intermediate stabilization Up to 12.5s
-            tsm.setNextTime(sim_config.temp_start_time - 2.0, 11, 0.05)  # Pre-thermal Up to 18s
-            tsm.setNextTime(sim_config.temp_start_time, 4, 0.05)  # Just before thermal Up to 20s
+            tsm.setNextTime(sim_config.loading_time + 1.0, 5, 0.01)  # First second after loading Up to 11s
+            tsm.setNextTime(sim_config.loading_time + 2.5, 7, 0.02)  # Intermediate stabilization Up to 12.5s
+            tsm.setNextTime(sim_config.temp_start_time - 2.0, 5, 0.05)  # Pre-thermal Up to 18s
+            tsm.setNextTime(sim_config.temp_start_time, 2, 0.05)  # Just before thermal Up to 20s
 
             # Phase 3: Thermal loading (temp_start_time to temp_end_time) - adaptive steps
             thermal_duration = sim_config.temp_end_time - sim_config.temp_start_time
             tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.1, 3, 0.05)  # Thermal start Up to 21.5s
-            tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.5, 12, 0.05)  # Mid thermal Up to 27.5s
-            tsm.setNextTime(sim_config.temp_end_time, 37, 0.02)  # End thermal - finest steps Up to 35s
+            tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.5, 6, 0.05)  # Mid thermal Up to 27.5s
+            tsm.setNextTime(sim_config.temp_end_time, 18, 0.02)  # End thermal - finest steps Up to 35s
 
             # Phase 4: Final phase - can use larger steps again
             if sim_config.temp_end_time < sim_config.final_time:
@@ -1106,9 +856,9 @@ def getMetafor(d={}):
 
         else:
             # Pure mechanical - simpler time stepping
-            tsm.setNextTime(sim_config.loading_time * 0.5, 25, 0.01)
-            tsm.setNextTime(sim_config.loading_time, 50, 0.005)
-            tsm.setNextTime(sim_config.final_time, 40, 0.05)
+            tsm.setNextTime(sim_config.loading_time * 0.5, 13, 0.01) # Up to 5s
+            tsm.setNextTime(sim_config.loading_time, 25, 0.005) # Up to 10s
+            tsm.setNextTime(sim_config.final_time, 20, 0.05) # Up to 30s
 
     else:
         print(f"INFO: Using FIXED time stepping with dt = {sim_config.fixed_timestep_size}.")
@@ -1138,17 +888,16 @@ def getMetafor(d={}):
 
     # MECHANICAL ITERATION MANAGER - OPTIMIZED with compatibility management
     mim = metafor.getMechanicalIterationManager()
-    mim.setResidualComputationMethod(
-        Method4ResidualComputation())  # ----------------------------------------------Line added
+    mim.setResidualComputationMethod(Method4ResidualComputation()) #----------------------------------------------Line added
     # Stricter parameters for plasticity
     # ENHANCED CONVERGENCE CONTROL for critical phases
     fct_MaxIter = PieceWiseLinearFunction()
     fct_MaxIter.setData(0.0, 25.0)  # Standard for the start
-    fct_MaxIter.setData(sim_config.loading_time * 0.75, 35.0)  # More iterations until the end loading
-    fct_MaxIter.setData(sim_config.loading_time, 40.0)  # Max for transition
-    fct_MaxIter.setData(sim_config.loading_time + 2.5, 35.0)  # Critical stabilization
-    fct_MaxIter.setData(sim_config.temp_start_time, 30.0)  # Normal return before thermal
-    fct_MaxIter.setData(sim_config.temp_end_time, 40.0)  # Max pendant thermal
+    fct_MaxIter.setData(sim_config.loading_time * 0.75, 35.0) # More iterations until the end loading
+    fct_MaxIter.setData(sim_config.loading_time, 40.0) # Max for transition
+    fct_MaxIter.setData(sim_config.loading_time + 2.5, 35.0) # Critical stabilization
+    fct_MaxIter.setData(sim_config.temp_start_time, 30.0) # Normal return before thermal
+    fct_MaxIter.setData(sim_config.temp_end_time, 40.0) # Max pendant thermal
     fct_MaxIter.setData(sim_config.final_time, 25.0)  # Standard until the end
 
     # Apply adaptive iteration control
@@ -1216,76 +965,162 @@ def getMetafor(d={}):
     interactionset = domain.getInteractionSet()
     if not p['postpro']:
         hcurves = metafor.getValuesManager()
-        hcurves.add(1, MiscValueExtractor(metafor, EXT_T), 'time')
-        hcurves.add(2, NormalForceValueExtractor(ci), SumOperator(), 'ContactForceY')
-        hcurves.add(3, DbNodalValueExtractor(p20, Field1D(TY, RE)), SumOperator(), 'displacement_rod_end_Y')
-        hcurves.add(4, DbNodalValueExtractor(c3, Field1D(TY, GF1)), SumOperator(), 'forceYExtClampinPt')
-        hcurves.add(5, DbNodalValueExtractor(c3, Field1D(TX, GF1)), SumOperator(), 'forceXExtClampinPt')
-        hcurves.add(6, DbNodalValueExtractor(p17, Field1D(TY, GF1)), SumOperator(), 'forceYHinge')
-        hcurves.add(7, DbNodalValueExtractor(p17, Field1D(TX, GF1)), SumOperator(), 'forceXHinge')
+        extractor_count = 0  # Total number of extractors effectively added
 
-        # Moment at clamping point
+        # === Time and force monitoring ===
+        hcurves.add(1, MiscValueExtractor(metafor, EXT_T), 'time');
+        extractor_count += 1
+        hcurves.add(2, NormalForceValueExtractor(ci), SumOperator(), 'ContactForceY');
+        extractor_count += 1
+
+        # === Displacements and external forces ===
+        hcurves.add(3, DbNodalValueExtractor(p20, Field1D(TY, RE)), SumOperator(), 'displacement_rod_end_Y');
+        extractor_count += 1
+        hcurves.add(4, DbNodalValueExtractor(c3, Field1D(TY, GF1)), SumOperator(), 'forceYExtClampinPt');
+        extractor_count += 1
+        hcurves.add(5, DbNodalValueExtractor(c3, Field1D(TX, GF1)), SumOperator(), 'forceXExtClampinPt');
+        extractor_count += 1
+        hcurves.add(6, DbNodalValueExtractor(p17, Field1D(TY, GF1)), SumOperator(), 'forceYHinge');
+        extractor_count += 1
+        hcurves.add(7, DbNodalValueExtractor(p17, Field1D(TX, GF1)), SumOperator(), 'forceXHinge');
+        extractor_count += 1
+
+        # === Moment at clamping point ===
         ext0 = MomentValueExtractor(c3, pa3, TZ, GF1)
-        hcurves.add(8, ext0, SumOperator(), 'MomentExtClampingPt')
+        hcurves.add(8, ext0, SumOperator(), 'MomentExtClampingPt');
+        extractor_count += 1
 
-        # Von Mises stress in blade
+        # === Von Mises stress in blade ===
         ext_becu = IFNodalValueExtractor(interactionset(1), IF_EVMS)
-        hcurves.add(9, ext_becu, MaxOperator(), 'Max_VonMises_BeCu')
+        hcurves.add(9, ext_becu, MaxOperator(), 'Max_VonMises_BeCu');
+        extractor_count += 1
 
-        # Mass corner displacements - KEY for the analysis
-        hcurves.add(10, DbNodalValueExtractor(p10, Field1D(TY, RE)), SumOperator(), 'dispY_Bottom_left_mass')
-        hcurves.add(11, DbNodalValueExtractor(p11, Field1D(TY, RE)), SumOperator(), 'dispY_Bottom_right_mass')
-        hcurves.add(12, DbNodalValueExtractor(p12, Field1D(TY, RE)), SumOperator(), 'dispY_Top_right_mass')
-        hcurves.add(13, DbNodalValueExtractor(p9, Field1D(TY, RE)), SumOperator(), 'dispY_Top_left_mass')
+        # === Mass corner displacements (Y) ===
+        hcurves.add(10, DbNodalValueExtractor(p10, Field1D(TY, RE)), SumOperator(), 'dispY_Bottom_left_mass');
+        extractor_count += 1
+        hcurves.add(11, DbNodalValueExtractor(p11, Field1D(TY, RE)), SumOperator(), 'dispY_Bottom_right_mass');
+        extractor_count += 1
+        hcurves.add(12, DbNodalValueExtractor(p12, Field1D(TY, RE)), SumOperator(), 'dispY_Top_right_mass');
+        extractor_count += 1
+        hcurves.add(13, DbNodalValueExtractor(p9, Field1D(TY, RE)), SumOperator(), 'dispY_Top_left_mass');
+        extractor_count += 1
 
-        # X displacements for thermal effects
-        hcurves.add(14, DbNodalValueExtractor(p20, Field1D(TX, RE)), SumOperator(), 'dispX_rod_end')
+        # === Rod end X-displacement (thermal reference) ===
+        hcurves.add(14, DbNodalValueExtractor(p20, Field1D(TX, RE)), SumOperator(), 'dispX_rod_end');
+        extractor_count += 1
 
-        # THERMAL EXTRACTORS - Critical for the study
+        # === Plasticity extractors ===
+        if sim_config.enable_plasticityData:
+            # --- Plastic strain monitoring ---
+            hcurves.add(15, IFNodalValueExtractor(interactionset(1), IF_EPL), MaxOperator(),
+                        'max_plastic_strain_blade');
+            extractor_count += 1
+            hcurves.add(16, IFNodalValueExtractor(interactionset(1), IF_EPL), MeanOperator(),
+                        'mean_plastic_strain_blade');
+            extractor_count += 1
+            hcurves.add(17, IFNodalValueExtractor(interactionset(2), IF_EPL), MaxOperator(),
+                        'max_plastic_strain_structure');
+            extractor_count += 1
+
+            # --- Plastic strain rate (DEPL assumed to track rate proxy here) ---
+            hcurves.add(18, IFNodalValueExtractor(interactionset(1), IF_DEPL), MaxOperator(),
+                        'max_plastic_strain_rate_blade');
+            extractor_count += 1
+            hcurves.add(19, IFNodalValueExtractor(interactionset(1), IF_DEPL), MeanOperator(),
+                        'mean_plastic_strain_rate_blade');
+            extractor_count += 1
+
+            # --- Yield criterion and stress ---
+            hcurves.add(20, IFNodalValueExtractor(interactionset(1), IF_CRITERION), MaxOperator(),
+                        'max_yield_function_blade');
+            extractor_count += 1
+            hcurves.add(21, IFNodalValueExtractor(interactionset(1), IF_CRITERION), MeanOperator(),
+                        'mean_yield_function_blade');
+            extractor_count += 1
+            hcurves.add(22, IFNodalValueExtractor(interactionset(1), IF_YIELD_STRESS), MaxOperator(),
+                        'max_yield_stress_blade');
+            extractor_count += 1
+            hcurves.add(23, IFNodalValueExtractor(interactionset(1), IF_YIELD_STRESS), MeanOperator(),
+                        'mean_yield_stress_blade');
+            extractor_count += 1
+
+            # --- Von Mises (mean) ---
+            hcurves.add(24, IFNodalValueExtractor(interactionset(1), IF_EVMS), MeanOperator(), 'mean_VonMises_blade');
+            extractor_count += 1
+
+            # === Stress analysis ===
+            # --- Cartesian stress components ---
+            hcurves.add(25, IFNodalValueExtractor(interactionset(1), IF_SIG_XX), MaxOperator(), 'max_stress_xx_blade');
+            extractor_count += 1
+            hcurves.add(26, IFNodalValueExtractor(interactionset(1), IF_SIG_YY), MaxOperator(), 'max_stress_yy_blade');
+            extractor_count += 1
+            hcurves.add(27, IFNodalValueExtractor(interactionset(1), IF_SIG_XY), MaxOperator(), 'max_stress_xy_blade');
+            extractor_count += 1
+
+            # --- Principal stresses ---
+            hcurves.add(28, IFNodalValueExtractor(interactionset(1), IF_SIG_1), MaxOperator(),
+                        'max_principal_stress_1_blade');
+            extractor_count += 1
+            hcurves.add(29, IFNodalValueExtractor(interactionset(1), IF_SIG_2), MaxOperator(),
+                        'max_principal_stress_2_blade');
+            extractor_count += 1
+            hcurves.add(30, IFNodalValueExtractor(interactionset(1), IF_SIG_3), MaxOperator(),
+                        'max_principal_stress_3_blade');
+            extractor_count += 1
+
+            # --- Hydrostatic pressure ---
+            hcurves.add(31, IFNodalValueExtractor(interactionset(1), IF_P), MaxOperator(), 'max_pressure_blade');
+            extractor_count += 1
+            hcurves.add(32, IFNodalValueExtractor(interactionset(1), IF_P), MeanOperator(), 'mean_pressure_blade');
+            extractor_count += 1
+
+            # --- Stress triaxiality ---
+            hcurves.add(33, IFNodalValueExtractor(interactionset(1), IF_TRIAX), MaxOperator(), 'max_triaxiality_blade');
+            extractor_count += 1
+            hcurves.add(34, IFNodalValueExtractor(interactionset(1), IF_TRIAX), MeanOperator(),
+                        'mean_triaxiality_blade');
+            extractor_count += 1
+
+        # === Thermal extractors ===
         if sim_config.enable_thermal:
-            # Temperature monitoring
-            hcurves.add(15, DbNodalValueExtractor(s1, Field1D(TO, RE)), MeanOperator(), 'temp_mean_blade_K')
-            hcurves.add(16, DbNodalValueExtractor(s1, Field1D(TO, RE)), MaxOperator(), 'temp_max_blade_K')
-            hcurves.add(17, DbNodalValueExtractor(s1, Field1D(TO, RE)), MinOperator(), 'temp_min_blade_K')
+            # --- Temperature monitoring ---
+            hcurves.add(35, DbNodalValueExtractor(s1, Field1D(TO, RE)), MeanOperator(), 'temp_mean_blade_K');
+            extractor_count += 1
+            hcurves.add(36, DbNodalValueExtractor(s1, Field1D(TO, RE)), MaxOperator(), 'temp_max_blade_K');
+            extractor_count += 1
+            hcurves.add(37, DbNodalValueExtractor(s1, Field1D(TO, RE)), MinOperator(), 'temp_min_blade_K');
+            extractor_count += 1
 
-            # Thermal strains - Important for understanding thermal effects
-            hcurves.add(18, IFNodalValueExtractor(interactionset(1), IF_THERMAL_STRAIN), MeanOperator(),
-                        'thermal_strain_mean_blade')
-            hcurves.add(19, IFNodalValueExtractor(interactionset(1), IF_THERMAL_STRAIN), MaxOperator(),
-                        'thermal_strain_max_blade')
+            # --- Thermal strain (material expansion) ---
+            hcurves.add(38, IFNodalValueExtractor(interactionset(1), IF_THERMAL_STRAIN), MeanOperator(),
+                        'thermal_strain_mean_blade');
+            extractor_count += 1
+            hcurves.add(39, IFNodalValueExtractor(interactionset(1), IF_THERMAL_STRAIN), MaxOperator(),
+                        'thermal_strain_max_blade');
+            extractor_count += 1
 
-            # Effective thermal displacement (mass movement due to thermal expansion)
-            hcurves.add(20, DbNodalValueExtractor(p12, Field1D(TX, RE)), SumOperator(), 'thermal_dispX_mass_top_right')
-            hcurves.add(21, DbNodalValueExtractor(p12, Field1D(TY, RE)), SumOperator(), 'thermal_dispY_mass_top_right')
+            # --- Thermal-induced displacements (mass top corner) ---
+            hcurves.add(40, DbNodalValueExtractor(p12, Field1D(TX, RE)), SumOperator(), 'thermal_dispX_mass_top_right');
+            extractor_count += 1
+            hcurves.add(41, DbNodalValueExtractor(p12, Field1D(TY, RE)), SumOperator(), 'thermal_dispY_mass_top_right');
+            extractor_count += 1
 
-            # Blade tip temperature and displacement for calibration
-            hcurves.add(22, DbNodalValueExtractor(p3, Field1D(TO, RE)), SumOperator(), 'temp_blade_tip_K')
-            hcurves.add(23, DbNodalValueExtractor(p3, Field1D(TX, RE)), SumOperator(), 'dispX_blade_tip')
-            hcurves.add(24, DbNodalValueExtractor(p3, Field1D(TY, RE)), SumOperator(), 'dispY_blade_tip')
+            # --- Blade tip temperature and displacement ---
+            hcurves.add(42, DbNodalValueExtractor(p3, Field1D(TO, RE)), SumOperator(), 'temp_blade_tip_K');
+            extractor_count += 1
+            hcurves.add(43, DbNodalValueExtractor(p3, Field1D(TX, RE)), SumOperator(), 'dispX_blade_tip');
+            extractor_count += 1
+            hcurves.add(44, DbNodalValueExtractor(p3, Field1D(TY, RE)), SumOperator(), 'dispY_blade_tip');
+            extractor_count += 1
 
-        # Validation of extractors
-        # Plastic strain extractors to monitor plasticity
-        if sim_config.enable_thermal:
-            hcurves.add(25, IFNodalValueExtractor(interactionset(1), IF_EPL), MaxOperator(),
-                        'max_plastic_strain_blade')
-            hcurves.add(26, IFNodalValueExtractor(interactionset(1), IF_CRITERION), MaxOperator(),
-                        'max_yield_function_blade')
-            hcurves.add(27, IFNodalValueExtractor(interactionset(2), IF_EPL), MaxOperator(),
-                        'max_plastic_strain_structure')
-            max_extractor = 27
-        else:
-            max_extractor = 14
-
-        # If only elastic , use those :
-        # max_extractor = 24 if sim_config.enable_thermal else 14
-
-        for i in range(1, max_extractor + 1):
+        # === Final check: verify all extractors that were added ===
+        for i in range(1, extractor_count + 1):
             metafor.getTestSuiteChecker().checkExtractor(i)
 
     # REAL-TIME PLOTTING - OPTIMIZED for thermal monitoring
     if not p['postpro']:
         try:
-            # Plot 1: Mass displacements (your main interest)
+            # === Plot 1: Mass displacements (always shown) ===
             plot1 = DataCurveSet()
             plot1.add(VectorDataCurve(3, hcurves.getDataVector(1), hcurves.getDataVector(3), 'Rod End Y'))
             plot1.add(VectorDataCurve(10, hcurves.getDataVector(1), hcurves.getDataVector(10), 'Mass Bottom Left Y'))
@@ -1300,88 +1135,204 @@ def getMetafor(d={}):
             win1.setPlotYLabel("Y Displacement [mm]")
             metafor.addObserver(win1)
 
-            if sim_config.enable_thermal:
-                # Plot 2: Temperature evolution in blade
+            # === Plasticity-related plots ===
+            if sim_config.enable_plasticityData:
+
+                # --- Plot 2: Plastic strain evolution ---
                 plot2 = DataCurveSet()
-                plot2.add(VectorDataCurve(15, hcurves.getDataVector(1), hcurves.getDataVector(15), 'Mean Temp Blade'))
-                plot2.add(VectorDataCurve(16, hcurves.getDataVector(1), hcurves.getDataVector(16), 'Max Temp Blade'))
-                plot2.add(VectorDataCurve(17, hcurves.getDataVector(1), hcurves.getDataVector(17), 'Min Temp Blade'))
-                plot2.add(VectorDataCurve(22, hcurves.getDataVector(1), hcurves.getDataVector(22), 'Blade Tip Temp'))
+                plot2.add(
+                    VectorDataCurve(15, hcurves.getDataVector(1), hcurves.getDataVector(15), 'Max Plastic Strain'))
+                plot2.add(
+                    VectorDataCurve(16, hcurves.getDataVector(1), hcurves.getDataVector(16), 'Mean Plastic Strain'))
+                plot2.add(
+                    VectorDataCurve(18, hcurves.getDataVector(1), hcurves.getDataVector(18), 'Max Plastic Strain Rate'))
 
                 win2 = VizWin()
                 win2.add(plot2)
-                win2.setPlotTitle("Temperature Evolution - Be-Cu Blade (10C -> 50C)")
+                win2.setPlotTitle("Plastic Strain Evolution - Material Nonlinearity")
                 win2.setPlotXLabel("Time [s]")
-                win2.setPlotYLabel("Temperature [K]")
+                win2.setPlotYLabel("Plastic Strain [-]")
                 metafor.addObserver(win2)
 
-                # Plot 3: Thermal effects on displacement
+                # --- Plot 3: Stress vs Yield comparison ---
                 plot3 = DataCurveSet()
+                plot3.add(VectorDataCurve(9, hcurves.getDataVector(1), hcurves.getDataVector(9), 'Max Von Mises'))
+                plot3.add(VectorDataCurve(24, hcurves.getDataVector(1), hcurves.getDataVector(24), 'Mean Von Mises'))
+                plot3.add(VectorDataCurve(23, hcurves.getDataVector(1), hcurves.getDataVector(23), 'Mean Yield Stress'))
                 plot3.add(
-                    VectorDataCurve(20, hcurves.getDataVector(1), hcurves.getDataVector(20), 'Mass Thermal Disp X'))
-                plot3.add(
-                    VectorDataCurve(21, hcurves.getDataVector(1), hcurves.getDataVector(21), 'Mass Thermal Disp Y'))
-                plot3.add(VectorDataCurve(14, hcurves.getDataVector(1), hcurves.getDataVector(14), 'Rod End Disp X'))
+                    VectorDataCurve(21, hcurves.getDataVector(1), hcurves.getDataVector(21), 'Mean Yield Function'))
+
+                if blade_config.material == 'INVAR':
+                    elastic_limit = 250.0  # MPa
+                elif blade_config.material == 'BE_CU':
+                    elastic_limit = 1000.0  # MPa
 
                 win3 = VizWin()
                 win3.add(plot3)
-                win3.setPlotTitle("Thermal-Induced Displacements - Sensor Response")
+                win3.setPlotTitle(
+                    f"Stress Evolution vs Yield ({blade_config.material} - Initial Elastic Limit: {elastic_limit} MPa)")
                 win3.setPlotXLabel("Time [s]")
-                win3.setPlotYLabel("Displacement [mm]")
+                win3.setPlotYLabel("Stress [MPa]")
                 metafor.addObserver(win3)
 
-                # Plot 4: Thermal strain evolution
+                # --- Plot 4: Stress components evolution ---
                 plot4 = DataCurveSet()
+                plot4.add(VectorDataCurve(25, hcurves.getDataVector(1), hcurves.getDataVector(25), 'Max σ_xx'))
+                plot4.add(VectorDataCurve(26, hcurves.getDataVector(1), hcurves.getDataVector(26), 'Max σ_yy'))
+                plot4.add(VectorDataCurve(27, hcurves.getDataVector(1), hcurves.getDataVector(27), 'Max σ_xy'))
                 plot4.add(
-                    VectorDataCurve(18, hcurves.getDataVector(1), hcurves.getDataVector(18), 'Mean Thermal Strain'))
-                plot4.add(
-                    VectorDataCurve(19, hcurves.getDataVector(1), hcurves.getDataVector(19), 'Max Thermal Strain'))
+                    VectorDataCurve(28, hcurves.getDataVector(1), hcurves.getDataVector(28), 'Max σ_1 (Principal)'))
 
                 win4 = VizWin()
                 win4.add(plot4)
-                win4.setPlotTitle("Thermal Strain Evolution - Material Response")
+                win4.setPlotTitle("Stress Components Evolution")
                 win4.setPlotXLabel("Time [s]")
-                win4.setPlotYLabel("Thermal Strain [-]")
+                win4.setPlotYLabel("Stress [MPa]")
                 metafor.addObserver(win4)
 
-                # Plot 5: Rod End Displacement vs Temperature
+                # --- Plot 5: Pressure evolution ---
                 plot5 = DataCurveSet()
-                plot5.add(
-                    VectorDataCurve(14, hcurves.getDataVector(15), hcurves.getDataVector(3), 'Rod End Y vs Temp'))
+                plot5.add(VectorDataCurve(31, hcurves.getDataVector(1), hcurves.getDataVector(31), 'Max Pressure'))
+                plot5.add(VectorDataCurve(32, hcurves.getDataVector(1), hcurves.getDataVector(32), 'Mean Pressure'))
 
                 win5 = VizWin()
                 win5.add(plot5)
-                win5.setPlotTitle("Rod End Y Displacement vs Temperature")
-                win5.setPlotXLabel("Mean Temperature [K]")
-                win5.setPlotYLabel("Rod End Disp Y [mm]")
+                win5.setPlotTitle("Pressure Evolution")
+                win5.setPlotXLabel("Time [s]")
+                win5.setPlotYLabel("Pressure [MPa]")
                 metafor.addObserver(win5)
 
+                # --- Plot 6: Triaxiality evolution ---
+                plot6 = DataCurveSet()
+                plot6.add(VectorDataCurve(33, hcurves.getDataVector(1), hcurves.getDataVector(33), 'Max Triaxiality'))
+                plot6.add(VectorDataCurve(34, hcurves.getDataVector(1), hcurves.getDataVector(34), 'Mean Triaxiality'))
+
+                win6 = VizWin()
+                win6.add(plot6)
+                win6.setPlotTitle("Triaxiality Evolution")
+                win6.setPlotXLabel("Time [s]")
+                win6.setPlotYLabel("Triaxiality [-]")
+                metafor.addObserver(win6)
+
+                # --- Plot 7: Plasticity onset detection ---
+                plot7 = DataCurveSet()
+                plot7.add(
+                    VectorDataCurve(20, hcurves.getDataVector(1), hcurves.getDataVector(20), 'Max Yield Function'))
+                plot7.add(
+                    VectorDataCurve(21, hcurves.getDataVector(1), hcurves.getDataVector(21), 'Mean Yield Function'))
+                plot7.add(VectorDataCurve(19, hcurves.getDataVector(1), hcurves.getDataVector(19),
+                                          'Mean Plastic Strain Rate'))
+
+                win7 = VizWin()
+                win7.add(plot7)
+                win7.setPlotTitle("Plasticity Onset Monitoring - Criterion Function")
+                win7.setPlotXLabel("Time [s]")
+                win7.setPlotYLabel("Criterion Value / Plastic Strain Rate [-]")
+                metafor.addObserver(win7)
+
+            # === Thermal-related plots ===
+            if sim_config.enable_thermal:
+                # --- Plot 8: Temperature evolution in blade ---
+                plot8 = DataCurveSet()
+                plot8.add(VectorDataCurve(35, hcurves.getDataVector(1), hcurves.getDataVector(35), 'Mean Temp Blade'))
+                plot8.add(VectorDataCurve(36, hcurves.getDataVector(1), hcurves.getDataVector(36), 'Max Temp Blade'))
+                plot8.add(VectorDataCurve(37, hcurves.getDataVector(1), hcurves.getDataVector(37), 'Min Temp Blade'))
+                plot8.add(VectorDataCurve(42, hcurves.getDataVector(1), hcurves.getDataVector(42), 'Blade Tip Temp'))
+
+                win8 = VizWin()
+                win8.add(plot8)
+                win8.setPlotTitle("Temperature Evolution - Be-Cu Blade (10°C → 50°C)")
+                win8.setPlotXLabel("Time [s]")
+                win8.setPlotYLabel("Temperature [K]")
+                metafor.addObserver(win8)
+
+                # --- Plot 9: Thermal-induced displacements ---
+                plot9 = DataCurveSet()
+                plot9.add(
+                    VectorDataCurve(40, hcurves.getDataVector(1), hcurves.getDataVector(40), 'Mass Thermal Disp X'))
+                plot9.add(
+                    VectorDataCurve(41, hcurves.getDataVector(1), hcurves.getDataVector(41), 'Mass Thermal Disp Y'))
+                plot9.add(VectorDataCurve(14, hcurves.getDataVector(1), hcurves.getDataVector(14), 'Rod End Disp X'))
+
+                win9 = VizWin()
+                win9.add(plot9)
+                win9.setPlotTitle("Thermal-Induced Displacements - Sensor Response")
+                win9.setPlotXLabel("Time [s]")
+                win9.setPlotYLabel("Displacement [mm]")
+                metafor.addObserver(win9)
+
+                # --- Plot 10: Thermal strain evolution ---
+                plot10 = DataCurveSet()
+                plot10.add(
+                    VectorDataCurve(38, hcurves.getDataVector(1), hcurves.getDataVector(38), 'Mean Thermal Strain'))
+                plot10.add(
+                    VectorDataCurve(39, hcurves.getDataVector(1), hcurves.getDataVector(39), 'Max Thermal Strain'))
+
+                win10 = VizWin()
+                win10.add(plot10)
+                win10.setPlotTitle("Thermal Strain Evolution - Material Response")
+                win10.setPlotXLabel("Time [s]")
+                win10.setPlotYLabel("Thermal Strain [-]")
+                metafor.addObserver(win10)
+
+                # --- Plot 11: Rod end Y displacement vs temperature ---
+                plot11 = DataCurveSet()
+                plot11.add(
+                    VectorDataCurve(14, hcurves.getDataVector(35), hcurves.getDataVector(3), 'Rod End Y vs Temp'))
+
+                win11 = VizWin()
+                win11.add(plot11)
+                win11.setPlotTitle("Rod End Y Displacement vs Temperature")
+                win11.setPlotXLabel("Mean Temperature [K]")
+                win11.setPlotYLabel("Rod End Disp Y [mm]")
+                metafor.addObserver(win11)
+
+                # --- Plot 12: Thermomechanical coupling ---
+                if sim_config.enable_plasticityData:
+                    plot12 = DataCurveSet()
+                    plot12.add(VectorDataCurve(15, hcurves.getDataVector(35), hcurves.getDataVector(15),
+                                               'Max Plastic Strain vs Temperature'))
+                    plot12.add(VectorDataCurve(9, hcurves.getDataVector(35), hcurves.getDataVector(9),
+                                               'Von Mises vs Temperature'))
+
+                    win12 = VizWin()
+                    win12.add(plot12)
+                    win12.setPlotTitle("Thermomechanical Coupling - Temperature Effects on Plasticity")
+                    win12.setPlotXLabel("Mean Temperature [K]")
+                    win12.setPlotYLabel("Plastic Strain [-] / Von Mises [MPa]")
+                    metafor.addObserver(win12)
+
+                # --- Plot 13: Blade tip displacement vs time ---
+                plot13 = DataCurveSet()
+                plot13.add(VectorDataCurve(43, hcurves.getDataVector(1), hcurves.getDataVector(43), 'Blade Tip Disp X'))
+                plot13.add(VectorDataCurve(44, hcurves.getDataVector(1), hcurves.getDataVector(44), 'Blade Tip Disp Y'))
+
+                win13 = VizWin()
+                win13.add(plot13)
+                win13.setPlotTitle("Blade Tip Displacement Evolution")
+                win13.setPlotXLabel("Time [s]")
+                win13.setPlotYLabel("Displacement [mm]")
+                metafor.addObserver(win13)
 
         except NameError:
             print("Warning: Visualization not available")
             pass
 
-    # CRITICAL: Add the observer to handle automatic chaining
-    if not manager.simulation_active:
-        observer = SequentialSimulationObserver()
-        metafor.addObserver(observer)
-        manager.simulation_active = True
-        manager.log_message("Sequential simulation observer attached.")
-
-    return metafor  # Your existing return
+    return metafor
 
 
 
-# Modified postpro function to handle sequential processing
+
+
+# ----------------------------------------------------------------------------------
+# OPTIMIZED Modal analysis with thermal effects consideration
+from toolbox.utilities import *
+
+
 def postpro():
     """
-    Enhanced post-processing for sequential simulations
+    Enhanced post-processing for thermal-mechanical analysis
     """
-    manager = get_simulation_manager()
-    current_config_name = manager.configurations[manager.current_config_index]['name']
-
-    manager.log_message(f"\n=== POST-PROCESSING: {current_config_name} ===")
-
     import os.path
     # Working directory
     setDir('workspace/%s' % os.path.splitext(os.path.basename(__file__))[0])
@@ -1496,25 +1447,195 @@ def postpro():
         print('3. Numerical conditioning issues')
         print('4. Missing math import (add: import math at the top)')
 
-    # After postprocessing, handle simulation completion
-    continue_simulations = handle_simulation_completion()
 
-    if continue_simulations:
-        manager.log_message("Next simulation will start automatically...")
-    else:
-        manager.log_message("All simulations completed. Check results directory for analysis.")
-
-
-def additional_diagnostics():
+# Alternative simpler version (closer to your working code):
+def postpro_simple():
     """
-    Enhanced diagnostics with simulation manager integration
+    Simplified version similar to your working code but with thermal state loading
     """
-    manager = get_simulation_manager()
-    current_config = manager.configurations[manager.current_config_index]
+    import os.path
+    import math  # Make sure math is imported
 
-    manager.log_message(f"\n=== DIAGNOSTICS: {current_config['name']} ===")
+    setDir('workspace/%s' % os.path.splitext(os.path.basename(__file__))[0])
+    load(__name__)
 
+    p = {}
+    p['postpro'] = True
+    metafor = instance(p)
+    domain = metafor.getDomain()
+
+    # Load the last archive (thermal state)
+    loader = fac.FacManager(metafor)
+    loader.load()
+
+    # Set up curves
+    curves = metafor.getValuesManager()
+
+    # Configure Lanczos analysis
+    lanczos = LanczosFrequencyAnalysisMethod(domain)
+    lanczos.setNumberOfEigenValues(8)  # More modes for better analysis
+    lanczos.setSpectralShifting(0.0)
+    lanczos.setComputeEigenVectors(True)
+    lanczos.setWriteMatrix2Matlab(True)
+
+    print('\n=== Modal Analysis on Thermal State ===')
+    print('Computing Eigenvalues...')
+
+    # Execute analysis
+    lanczos.execute()
+    lanczos.writeTSC()
+
+    # Add to curves
+    curves.add(11, FrequencyAnalysisValueExtractor(lanczos), 'freqs_thermal')
+
+    # Fill and save
+    curves.fillNow(metafor.getCurrentStepNo())
+    curves.toAscii()
+    curves.flush()
+
+    # Display results
+    print('\n--- Results ---')
+    for i in range(min(8, lanczos.getNumberOfEigenValues())):
+        eigenval = lanczos.getEigenValue(i)
+        if eigenval > 0:
+            frequency_hz = eigenval  # eigenval is actually frequency in Hz
+            true_eigenvalue = (2 * math.pi * frequency_hz) ** 2  # Calculate true eigenvalue
+            print(f'Mode {i + 1}: Frequency = {frequency_hz:.4f} Hz, True Eigenvalue = {true_eigenvalue:.6e}')
+
+            if i == 0:  # First mode comparison
+                expected = 2.91
+                error = abs(frequency_hz - expected) / expected * 100
+                print(f'  (Expected ~{expected} Hz, Error: {error:.1f}%)')
+        else:
+            print(f'Mode {i + 1}: Invalid eigenvalue = {eigenval:.6e}')
+
+    # Read and verify saved file
+    try:
+        with open('freqs_thermal.ascii') as f:
+            txt = f.readlines()
+        frequencies = [float(v) for v in txt[0].strip().split()]
+        true_eigenvalues = [(2 * math.pi * f) ** 2 for f in frequencies]
+        print(f'\nSaved frequencies: {[f"{f:.4f} Hz" for f in frequencies[:5]]}')
+        print(f'True eigenvalues: {[f"{ev:.6e}" for ev in true_eigenvalues[:5]]}')
+    except Exception as e:
+        print(f'Could not read output file: {e}')
+
+
+# Visualization version (if you want to see mode shapes)
+def postpro_with_viz():
+    """
+    Version with visualization like your original working code
+    """
+    import os.path
+    import math
+
+    setDir('workspace/%s' % os.path.splitext(os.path.basename(__file__))[0])
+    load(__name__)
+
+    p = {}
+    p['postpro'] = True
+    metafor = instance(p)
+    domain = metafor.getDomain()
+
+    # Load thermal state
+    loader = fac.FacManager(metafor)
+    loader.load()
+
+    curves = metafor.getValuesManager()
+
+    lanczos = LanczosFrequencyAnalysisMethod(domain)
+    lanczos.setNumberOfEigenValues(8)
+    lanczos.setSpectralShifting(0.0)
+    lanczos.setComputeEigenVectors(True)
+    lanczos.setWriteMatrix2Matlab(True)
+
+    lanczos.execute()
+    lanczos.writeTSC()
+    curves.add(11, FrequencyAnalysisValueExtractor(lanczos), 'freqs_thermal_viz')
+
+    curves.fillNow(metafor.getCurrentStepNo())
+    curves.toAscii()
+    curves.flush()
+
+    # Visualization setup
+    win = VizWin()
+    for i in range(domain.getInteractionSet().size()):
+        win.add(domain.getInteractionSet().getInteraction(i))
+
+    # Show each mode
+    for i in range(min(3, lanczos.getNumberOfEigenValues())):
+        eigenval = lanczos.getEigenValue(i)
+        if eigenval > 0:
+            frequency_hz = eigenval  # eigenval is actually frequency in Hz
+            true_eigenvalue = (2 * math.pi * frequency_hz) ** 2  # Calculate true eigenvalue
+            lanczos.showEigenVector(i)
+            win.update()
+            print(f'Eigen Vector {i}, Frequency = {frequency_hz:.4f} Hz, True Eigenvalue = {true_eigenvalue:.6e}')
+            input("Press enter to continue to next mode...")
+        else:
+            print(f'Skipping mode {i}: invalid eigenvalue = {eigenval:.6e}')
+
+    # Final results
+    with open('freqs_thermal_viz.ascii') as f:
+        txt = f.readlines()
+    frequencies = [float(v) for v in txt[0].strip().split()]
+    true_eigenvalues = [(2 * math.pi * f) ** 2 for f in frequencies]
+    print(f'\nFinal frequencies = {frequencies[:5]}')
+    print(f'Final true eigenvalues = {true_eigenvalues[:5]}')
+
+def postpro_initial():
+    import os.path
+    setDir('workspace/%s' % os.path.splitext(os.path.basename(__file__))[0])
+    load(__name__)
+
+    p = {}
+    p['postpro'] = True
+    metafor = instance(p)
+    domain = metafor.getDomain()
+
+    # set new curves
+    curves = metafor.getValuesManager()
+
+    lanczos = LanczosFrequencyAnalysisMethod(domain)
+    lanczos.setNumberOfEigenValues(3)
+    lanczos.setSpectralShifting(0.0)
+    lanczos.setComputeEigenVectors(True)
+    lanczos.setWriteMatrix2Matlab(True)
+
+    # load the last archive
+    loader = fac.FacManager(metafor)
+    loader.load()
+
+    lanczos.execute()
+    lanczos.writeTSC()
+    fExtr = FrequencyAnalysisValueExtractor(lanczos)
+    curves.add(11, FrequencyAnalysisValueExtractor(lanczos), 'freqs')
+
+    # extraction
+    print('\nComputing Eigenvalues...')
+    curves.fillNow(metafor.getCurrentStepNo())
+    curves.toAscii()
+    curves.flush()
+
+    win = VizWin()
+    for i in range(domain.getInteractionSet().size()):
+        win.add(domain.getInteractionSet().getInteraction(i))
+    for i in range(3):
+        lanczos.showEigenVector(i)
+        win.update()
+        print('Eigen Vector ', i, 'EigenValue = ', lanczos.getEigenValue(i))
+        input("press enter to continue")
+
+    with open('freqs.ascii') as f:
+        txt = f.readlines()
+
+    print(f'eigenvalues = {[float(v) for v in txt[0].strip().split()]}')
+
+
+def additional_diagnostics(blade_config):
+    """Additional diagnostics to verify thermal condition with comprehensive analysis"""
     import os
+    import numpy as np
 
     print('\n=== THERMAL STATE DIAGNOSTICS ===')
 
@@ -1607,13 +1728,13 @@ def additional_diagnostics():
 
             if values:
                 # Convert to Celsius
-                initial_C = values[0] - 273.15
-                final_C = values[-1] - 273.15
+                initial_C = values[0] + 273.15
+                final_C = values[-1] + 273.15
                 delta_T = final_C - initial_C
 
                 print(f"{temp_type}:")
-                print(f"  Initial: {initial_C:.1f}°C ({values[0]:.1f}K)")
-                print(f"  Final: {final_C:.1f}°C ({values[-1]:.1f}K)")
+                print(f"  Initial: {initial_C:.1f}°C ({values[0]:.1f}C)")
+                print(f"  Final: {final_C:.1f}°C ({values[-1]:.1f}C)")
                 print(f"  Change: ΔT = {delta_T:.1f}°C")
 
     # Thermal strain analysis
@@ -1770,6 +1891,218 @@ def additional_diagnostics():
     except Exception as e:
         print(f"Error during linearity analysis: {e}")
 
+
+        # ========================================= PLASTICITY ANALYSIS =====================================================
+    print('\n=== PLASTICITY ANALYSIS ===')
+
+    # Define material properties for reference
+    material_properties = {
+        'BE_CU': {'elastic_limit': 1000.0, 'hardening': 1000.0},
+        'INVAR': {'elastic_limit': 250.0, 'hardening': 800.0}
+    }
+
+    # Determine current material (you'll need to pass this or detect it)
+    current_material = blade_config.material  # Change this based on your blade_config.material
+    elastic_limit = material_properties[current_material]['elastic_limit']
+
+    print(f"Material: {current_material}")
+    print(f"Elastic limit: {elastic_limit} MPa")
+
+    # Plasticity files to analyze
+    plasticity_files = {
+        'Max Von Mises Stress': 'Max_VonMises_BeCu.ascii',
+        'Max Plastic Strain': 'max_plastic_strain_blade.ascii',
+        'Mean Plastic Strain': 'mean_plastic_strain_blade.ascii',
+        'Max Plastic Strain Rate': 'max_plastic_strain_rate_blade.ascii',
+        'Max Yield Function': 'max_yield_function_blade.ascii',
+        'Max Yield Stress': 'max_yield_stress_blade.ascii',
+        'Max Triaxiality': 'max_triaxiality_blade.ascii',
+        'Max Principal Stress 1': 'max_principal_stress_1_blade.ascii',
+        'Max Principal Stress 2': 'max_principal_stress_2_blade.ascii',
+        'Max Principal Stress 3': 'max_principal_stress_3_blade.ascii',
+        'Max Pressure': 'max_pressure_blade.ascii'
+    }
+
+    print('\n--- PLASTICITY STATE ANALYSIS ---')
+    plasticity_data = {}
+
+    for param_name, filename in plasticity_files.items():
+        if os.path.exists(filename):
+            try:
+                with open(filename, 'r') as f:
+                    values = [float(line.strip()) for line in f if line.strip()]
+
+                if values:
+                    initial_val = values[0]
+                    final_val = values[-1]
+                    max_val = max(values)
+                    min_val = min(values)
+
+                    plasticity_data[param_name] = {
+                        'initial': initial_val,
+                        'final': final_val,
+                        'maximum': max_val,
+                        'minimum': min_val,
+                        'evolution': final_val - initial_val
+                    }
+
+                    print(f"{param_name}:")
+                    if 'Stress' in param_name or 'Pressure' in param_name:
+                        print(f"  Initial: {initial_val:.2f} MPa")
+                        print(f"  Final: {final_val:.2f} MPa")
+                        print(f"  Maximum: {max_val:.2f} MPa")
+                        print(f"  Evolution: {final_val - initial_val:.2f} MPa")
+                    elif 'Strain' in param_name:
+                        print(f"  Initial: {initial_val:.2e}")
+                        print(f"  Final: {final_val:.2e}")
+                        print(f"  Maximum: {max_val:.2e}")
+                        print(f"  Evolution: {final_val - initial_val:.2e}")
+                    else:
+                        print(f"  Initial: {initial_val:.6f}")
+                        print(f"  Final: {final_val:.6f}")
+                        print(f"  Maximum: {max_val:.6f}")
+                        print(f"  Evolution: {final_val - initial_val:.6f}")
+
+            except Exception as e:
+                print(f"Could not read {filename}: {e}")
+        else:
+            print(f"{param_name}: File not found ({filename})")
+
+    # Plasticity assessment
+    print('\n--- PLASTICITY ASSESSMENT ---')
+
+    if 'Max Von Mises Stress' in plasticity_data:
+        max_stress = plasticity_data['Max Von Mises Stress']['maximum']
+        final_stress = plasticity_data['Max Von Mises Stress']['final']
+
+        print(f"Maximum Von Mises stress reached: {max_stress:.2f} MPa")
+        print(f"Final Von Mises stress: {final_stress:.2f} MPa")
+        print(f"Elastic limit: {elastic_limit:.2f} MPa")
+
+        if max_stress > elastic_limit:
+            overstress = max_stress - elastic_limit
+            overstress_percent = (overstress / elastic_limit) * 100
+            print(f"*** PLASTICITY DETECTED ***")
+            print(f"Overstress: {overstress:.2f} MPa ({overstress_percent:.1f}% above elastic limit)")
+        else:
+            safety_factor = elastic_limit / max_stress
+            print(f"*** ELASTIC BEHAVIOR ***")
+            print(f"Safety factor: {safety_factor:.2f}")
+
+    if 'Max Plastic Strain' in plasticity_data:
+        max_plastic_strain = plasticity_data['Max Plastic Strain']['maximum']
+        final_plastic_strain = plasticity_data['Max Plastic Strain']['final']
+
+        if max_plastic_strain > 1e-8:
+            print(f"*** PLASTIC DEFORMATION CONFIRMED ***")
+            print(f"Maximum plastic strain: {max_plastic_strain:.2e}")
+            print(f"Final plastic strain: {final_plastic_strain:.2e}")
+
+            # Estimate permanent deformation
+            if max_plastic_strain > 1e-6:
+                print(f"*** SIGNIFICANT PLASTIC DEFORMATION ***")
+                print(f"This level of plastic strain may cause permanent changes")
+                print(f"to the sensor's mechanical properties and calibration")
+        else:
+            print(f"No significant plastic strain detected")
+
+    if 'Max Yield Function' in plasticity_data:
+        max_yield_function = plasticity_data['Max Yield Function']['maximum']
+        final_yield_function = plasticity_data['Max Yield Function']['final']
+
+        print(f"Maximum yield function value: {max_yield_function:.6f}")
+        print(f"Final yield function value: {final_yield_function:.6f}")
+
+        if max_yield_function > 1e-6:
+            print(f"*** YIELD FUNCTION ACTIVE (f > 0) ***")
+            print(f"Material is actively yielding during simulation")
+        else:
+            print(f"Yield function remains inactive (f </= 0)")
+
+    # Stress state analysis
+    if all(key in plasticity_data for key in
+           ['Max Principal Stress 1', 'Max Principal Stress 2', 'Max Principal Stress 3']):
+        print('\n--- STRESS STATE ANALYSIS ---')
+        sig1_max = plasticity_data['Max Principal Stress 1']['maximum']
+        sig2_max = plasticity_data['Max Principal Stress 2']['maximum']
+        sig3_max = plasticity_data['Max Principal Stress 3']['maximum']
+
+        print(f"Maximum principal stresses:")
+        print(f"  Sigma1 = {sig1_max:.2f} MPa")
+        print(f"  Sigma2 = {sig2_max:.2f} MPa")
+        print(f"  Sigma3 = {sig3_max:.2f} MPa")
+
+        # Determine stress state
+        if abs(sig2_max) < 0.1 * abs(sig1_max) and abs(sig3_max) < 0.1 * abs(sig1_max):
+            print("Stress state: Predominantly uniaxial")
+        elif abs(sig3_max) < 0.1 * max(abs(sig1_max), abs(sig2_max)):
+            print("Stress state: Predominantly plane stress")
+        else:
+            print("Stress state: Triaxial")
+
+    if 'Max Triaxiality' in plasticity_data:
+        max_triax = plasticity_data['Max Triaxiality']['maximum']
+        print(f"Maximum stress triaxiality: {max_triax:.3f}")
+
+        if max_triax > 0.33:
+            print("High triaxiality - potential for void growth")
+        elif max_triax < -0.33:
+            print("Compressive triaxiality - shear-dominated deformation")
+        else:
+            print("Moderate triaxiality - balanced stress state")
+
+    # Correlation with temperature
+    print('\n--- PLASTICITY-TEMPERATURE CORRELATION ---')
+
+    if time_values and 'Max Von Mises Stress' in plasticity_data:
+        try:
+            # Read stress evolution
+            with open('Max_VonMises_BeCu.ascii', 'r') as f:
+                stress_values = [float(line.strip()) for line in f if line.strip()]
+
+            if len(stress_values) == len(time_values):
+                # Find when plasticity starts (stress exceeds elastic limit)
+                plastic_start_indices = [i for i, stress in enumerate(stress_values) if stress > elastic_limit]
+
+                if plastic_start_indices:
+                    plastic_start_time = time_values[plastic_start_indices[0]]
+                    plastic_start_stress = stress_values[plastic_start_indices[0]]
+
+                    print(f"Plasticity initiated at:")
+                    print(f"  Time: {plastic_start_time:.2f} s")
+                    print(f"  Stress: {plastic_start_stress:.2f} MPa")
+
+                    # Correlate with temperature if available
+                    if os.path.exists('temp_mean_blade_K.ascii'):
+                        with open('temp_mean_blade_K.ascii', 'r') as f:
+                            temp_values = [float(line.strip()) for line in f if line.strip()]
+
+                        if len(temp_values) == len(time_values):
+                            delta_T = temp_values[plastic_start_indices[0]]  # in Kelvin
+                            plastic_start_temp_K = delta_T + 273.15 + 10.0
+                            plastic_start_temp_C = delta_T + 10.0
+
+                            print(f"  Temperature at plasticity onset: {plastic_start_temp_C:.1f}°C")
+                            print(f"  Temperature rise from start: {delta_T:.1f}°C")
+                else:
+                    print("No plasticity detected based on stress threshold")
+
+        except Exception as e:
+            print(f"Could not correlate plasticity with temperature: {e}")
+
+    print('\n--- PLASTICITY IMPACT ON SENSOR ---')
+    if 'Max Plastic Strain' in plasticity_data and plasticity_data['Max Plastic Strain']['maximum'] > 1e-6:
+        print("*** WARNING: SIGNIFICANT PLASTICITY DETECTED ***")
+        print("Potential impacts on sensor performance:")
+        print(" Permanent deformation may alter resonant frequencies")
+        print(" Stress relaxation could affect long-term stability")
+        print(" Calibration may drift due to permanent material changes")
+        print(" Consider reducing temperature range or stress levels")
+        print(" Material substitution (higher yield strength) may be needed")
+    else:
+        print(" Plasticity levels are minimal - sensor should maintain calibration")
+        print(" Elastic behavior preserved - good for long-term stability")
+
     # Displacement analysis - KEY for sensor performance (code original conservé)
     disp_files = {
         "Rod End Y": 'displacement_rod_end_Y.ascii',
@@ -1811,36 +2144,17 @@ def additional_diagnostics():
     print(f"gravitational wave detection sensitivity.")
     print('=' * 60)
 
-    manager.log_message("Diagnostics completed for current simulation")
-
-if __name__ == '__main__':
-    get_simulation_manager().run_all_simulations()
 
 
-# Usage instructions for integration:
-"""
-INTEGRATION INSTRUCTIONS:
+if __name__ == "__main__":
 
-1. Replace your existing getMetafor function with the modified version above
-2. The system will automatically:
-   - Run the first simulation when you "Load" and "Start time integration"
-   - Save results after each simulation
-   - Clean workspace for next simulation  
-   - Continue with next configuration
-   - Generate comparison report when all done
+    config = BladeConfig()
 
-3. For postprocessing, run postpro() ONCE after ALL simulations are complete
-   - The system will process each configuration's results automatically
+    # Main analysis : Only one at a time
+    postpro()
+    #postpro_simple() # Initial way to obtain the modal analysis
+    #postpro_with_viz() # Modal analysys with graphs
+    #postpro_initial() #Post pro of morgan code
 
-4. Directory structure will be:
-   AutomatedResults/
-   ├── BeCu_Baseline_Thermal/          (backup of workspace)
-   ├── BeCu_Mechanical_Only/           (backup of workspace)  
-   ├── INVAR_Thermal_Comparison/       (backup of workspace)
-   ├── BeCu_Thick_Variation/           (backup of workspace)
-   ├── BeCu_Width_Variation/           (backup of workspace)
-   ├── comparison_report.txt           (summary of all results)
-   └── simulation_log_YYYYMMDD_HHMMSS.txt (detailed log)
+    additional_diagnostics(config)
 
-5. Each backup directory contains all .ascii files and resFiles.txt from that simulation
-"""
