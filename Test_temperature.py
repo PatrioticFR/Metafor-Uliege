@@ -1,10 +1,10 @@
-# Ultra-high performance inertial sensor for gravitational waves detection
+# TFE: Towards the development of an ultra-high performance inertial sensor for
 # gravitational waves detection
 
 # Study of the muVINS with configurable blade parameters - OPTIMIZED VERSION
-# Adrien Pierrat based on the code of Morgane Zeoli
+# Morgane Zeoli
 
-# -*- coding: Windows CP1252 -*-
+# -*- coding: utf-8 -*-
 
 from wrap import *
 from wrap.mtFrequencyAnalysisw import *
@@ -25,9 +25,9 @@ class BladeConfig:
 
     def __init__(self):
         # Blade geometry
-        self.thickness = 0.28  # blade thickness (e)
-        self.length = 94.80  # blade length (L)
-        self.width = 19.1  # blade width (thickness in 3D)
+        self.thickness = 0.24  # blade thickness (e)
+        self.length = 105.25  # blade length (L)
+        self.width = 45.0  # blade width (thickness in 3D)
 
         # Material selection: 'BE_CU', 'INVAR', 'STEEL'
         self.material = 'BE_CU'
@@ -50,10 +50,10 @@ class SimulationConfig:
         self.loading_time = 10.0  # T_load - Mechanical loading up to 10s
         self.stabilization_time = 12.0  # Time when system is stabilized
 
-        # Temperature parameters - MODIFIED FOR 10C to 50C
+        # Temperature parameters - MODIFIED FOR 10°C to 50°C
         self.enable_thermal = True #True or False
-        self.temp_initial_kelvin = 273.15 + 10.0  # 10C initial
-        self.temp_final_kelvin = 273.15 + 50.0    # 50C final
+        self.temp_initial_kelvin = 273.15 + 10.0  # 10°C initial
+        self.temp_final_kelvin = 273.15 + 50.0    # 50°C final
         self.temp_start_time = 20.0  # Start of thermal change (modified)
         self.temp_end_time = 35.0    # End of thermal change (modified)
 
@@ -64,46 +64,28 @@ class SimulationConfig:
         self.angleClamp = 0.0  # clamping angle
 
 
-def setup_temperature_dependent_properties(material):
-    """Return temperature-dependent E and CTE functions for the given material."""
+# Temperature-dependent material properties for Be-Cu
+def setup_temperature_dependent_properties():
+    """Setup temperature-dependent material properties for 10°C to 50°C range"""
 
-    if material == 'BE_CU':
-        fctE = PieceWiseLinearFunction()
-        fctE.setData(283.15, 131e3)  # 10C (reference)
-        fctE.setData(290.15, 130.8e3)  # 17C
-        fctE.setData(293.15, 130.7e3)  # 20C
-        fctE.setData(300.15, 130.4e3)  # 27C
-        fctE.setData(310.15, 130.0e3)  # 37C
-        fctE.setData(320.15, 129.5e3)  # 47C
-        fctE.setData(323.15, 129.3e3)  # 50C
+    # Elastic modulus function for Be-Cu (GPa -> MPa) - ADJUSTED FOR 10-50°C
+    fctE = PieceWiseLinearFunction()
+    fctE.setData(283.15, 131e3)  # 10°C
+    fctE.setData(290.15, 130.8e3)  # 17°C
+    fctE.setData(293.15, 130.7e3)  # 20°C (reference)
+    fctE.setData(300.15, 130.4e3)  # 27°C
+    fctE.setData(310.15, 130.0e3)  # 37°C
+    fctE.setData(320.15, 129.5e3)  # 47°C
+    fctE.setData(323.15, 129.3e3)  # 50°C
 
-        fctCTE = PieceWiseLinearFunction()
-        fctCTE.setData(283.15, 17.0e-6)
-        fctCTE.setData(293.15, 17.2e-6)
-        fctCTE.setData(300.15, 17.4e-6)
-        fctCTE.setData(310.15, 17.6e-6)
-        fctCTE.setData(320.15, 17.8e-6)
-        fctCTE.setData(323.15, 17.9e-6)
-
-    elif material == 'INVAR':
-        fctE = PieceWiseLinearFunction()
-        fctE.setData(283.15, 141e3)
-        fctE.setData(293.15, 140.8e3)
-        fctE.setData(300.15, 140.7e3)
-        fctE.setData(310.15, 140.6e3)
-        fctE.setData(320.15, 140.5e3)
-        fctE.setData(323.15, 140.4e3)
-
-        fctCTE = PieceWiseLinearFunction()
-        fctCTE.setData(283.15, 1.1e-6)
-        fctCTE.setData(293.15, 1.2e-6)
-        fctCTE.setData(300.15, 1.3e-6)
-        fctCTE.setData(310.15, 1.4e-6)
-        fctCTE.setData(320.15, 1.5e-6)
-        fctCTE.setData(323.15, 1.6e-6)
-
-    else:
-        raise ValueError(f"Unsupported material: {material}")
+    # Thermal expansion coefficient function for Be-Cu - ADJUSTED FOR 10-50°C
+    fctCTE = PieceWiseLinearFunction()
+    fctCTE.setData(283.15, 17.0e-6)  # 10°C
+    fctCTE.setData(293.15, 17.2e-6)  # 20°C
+    fctCTE.setData(300.15, 17.4e-6)  # 27°C
+    fctCTE.setData(310.15, 17.6e-6)  # 37°C
+    fctCTE.setData(320.15, 17.8e-6)  # 47°C
+    fctCTE.setData(323.15, 17.9e-6)  # 50°C
 
     return fctE, fctCTE
 
@@ -145,9 +127,9 @@ def getMetafor(d={}):
     print(f"=== OPTIMIZED SEQUENCE ===")
     print(f"Phase 1 (0-{sim_config.loading_time}s): Mechanical loading & blade bending")
     print(
-        f"Phase 2 ({sim_config.stabilization_time}s): System stabilization at {sim_config.temp_initial_kelvin - 273.15:.0f}C")
+        f"Phase 2 ({sim_config.stabilization_time}s): System stabilization at {sim_config.temp_initial_kelvin - 273.15:.0f}°C")
     print(
-        f"Phase 3 ({sim_config.temp_start_time}-{sim_config.temp_end_time}s): Thermal loading {sim_config.temp_initial_kelvin - 273.15:.0f}C -> {sim_config.temp_final_kelvin - 273.15:.0f}C")
+        f"Phase 3 ({sim_config.temp_start_time}-{sim_config.temp_end_time}s): Thermal loading {sim_config.temp_initial_kelvin - 273.15:.0f}°C → {sim_config.temp_final_kelvin - 273.15:.0f}°C")
     print(f"Expected effect: Thermal expansion will displace the mass")  # MODIFIED MESSAGE
     print(f"===================================")
 
@@ -330,88 +312,60 @@ def getMetafor(d={}):
     materials = domain.getMaterialSet()
     laws = domain.getMaterialLawSet()
 
-    # Elastoplastic behavior laws
-    # Elastoplastic behavior laws according to the chosen material
-    if blade_config.material == 'BE_CU':
-        laws.define(1, LinearIsotropicHardening)
-        laws(1).put(IH_SIGEL, 1000.0)  # Limite elastique approximative pour Be-Cu
-        laws(1).put(IH_H, 1000.0)  # Module d'ecrouissage Be-Cu
-        yield_num = 1
-    elif blade_config.material == 'INVAR':
-        laws.define(2, LinearIsotropicHardening)
-        laws(2).put(IH_SIGEL, 250.0)  # Approximate elastic limit for Invar (~250 MPa)
-        laws(2).put(IH_H, 800.0)  # Hardening modulus Invar (moderate value)
-        yield_num = 2
-    else:
-        raise ValueError(f"Unsupported material: {blade_config.material}")
+    # Lois de comportement élastoplastiques
+    laws.define(1, LinearIsotropicHardening)
+    laws(1).put(IH_SIGEL, 1000.0)  # Limite élastique pour Be-Cu
+    laws(1).put(IH_H, 1000.0)  # Module d'écrouissage
 
     laws.define(2, LinearIsotropicHardening)
-    laws(2).put(IH_SIGEL, 400.0)  # Elastic limit for steel
-    laws(2).put(IH_H, 1000.0)  # Hardening modulus
+    laws(2).put(IH_SIGEL, 400.0)  # Limite élastique pour acier
+    laws(2).put(IH_H, 1000.0)  # Module d'écrouissage
 
     # Setup temperature-dependent functions
-    fctE, fctCTE = setup_temperature_dependent_properties(blade_config.material)
+    fctE, fctCTE = setup_temperature_dependent_properties()
 
     if sim_config.enable_thermal:
-        # to use thermal properties
-        #https://material-properties.org/beryllium-copper-density-strength-hardness-melting-point/#google_vignette
-        materials.define(1, TmEvpIsoHHypoMaterial)
-        if blade_config.material == 'BE_CU':
-            materials(1).put(MASS_DENSITY, 8.36e-9)
-            materials(1).put(POISSON_RATIO, 0.285)
-            materials(1).put(CONDUCTIVITY, 105.0)
-            materials(1).put(HEAT_CAPACITY, 420.e6)
-            materials(1).put(ELASTIC_MODULUS, 1.0)
-            materials(1).put(THERM_EXPANSION, 1.0)
-        elif blade_config.material == 'INVAR':
-            materials(1).put(MASS_DENSITY, 8.1e-9)
-            materials(1).put(POISSON_RATIO, 0.29)
-            materials(1).put(CONDUCTIVITY, 10.0)
-            materials(1).put(HEAT_CAPACITY, 500.e6)
-            materials(1).put(ELASTIC_MODULUS, 1.0)
-            materials(1).put(THERM_EXPANSION, 1.0)
-
+        # CORRECTION: Utiliser TmElastHypoMaterial au lieu de EvpIsoHHypoMaterial
+        # pour pouvoir utiliser les propriétés thermiques
+        materials.define(1, TmElastHypoMaterial)  # CHANGÉ ici
+        materials(1).put(MASS_DENSITY, 8.36e-9)
+        materials(1).put(ELASTIC_MODULUS, 1.0)
         materials(1).depend(ELASTIC_MODULUS, fctE, Field1D(TO, RE))
+        materials(1).put(POISSON_RATIO, 0.285)
+        materials(1).put(THERM_EXPANSION, 1.0)
         materials(1).depend(THERM_EXPANSION, fctCTE, Field1D(TO, RE))
+        materials(1).put(CONDUCTIVITY, 1.0)
+        materials(1).put(HEAT_CAPACITY, 1.e6)
         materials(1).put(DISSIP_TE, 0.0)
         materials(1).put(DISSIP_TQ, 0.0)
-        materials(1).put(YIELD_NUM, yield_num)
-        # Note: No YIELD_NUM and TmElastHypoMaterial if elastic only: Use TmEvpIsoHHypoMaterial if plastic
+        # Note: Pas de YIELD_NUM car TmElastHypoMaterial est élastique uniquement
 
-        # Structure material - Use TmElastHypoMaterial also for coherence
+        # Structure material - Utiliser TmElastHypoMaterial aussi pour cohérence
         # http://metafor.ltas.ulg.ac.be/dokuwiki/doc/user/elements/volumes/iso_hypo_materials
-        materials.define(2, TmEvpIsoHHypoMaterial)  # Change here
-        materials(2).put(MASS_DENSITY, 8.0415e-9)
+        materials.define(2, TmElastHypoMaterial)  # CHANGÉ ici
+        materials(2).put(MASS_DENSITY, 7.93e-9)
         materials(2).put(ELASTIC_MODULUS, 210e3)
         materials(2).put(POISSON_RATIO, 0.3)
-        materials(2).put(THERM_EXPANSION, 0.0)  # No thermal expansion of the structure
-        materials(2).put(CONDUCTIVITY, 50)
-        materials(2).put(HEAT_CAPACITY, 500.e6)
+        materials(2).put(THERM_EXPANSION, 0.0)  # Pas d'expansion thermique pour la structure
+        materials(2).put(CONDUCTIVITY, 1.0)
+        materials(2).put(HEAT_CAPACITY, 1.e6)
         materials(2).put(DISSIP_TE, 0.0)
         materials(2).put(DISSIP_TQ, 0.0)
-        materials(2).put(YIELD_NUM, 2)
-        # Note: No YIELD_NUM and TmElastHypoMaterial if elastic only
+        # Note: Pas de YIELD_NUM car TmElastHypoMaterial est élastique uniquement
 
     else:
-        # Mechanical only - Use ElastHypoMaterial if simple elastic (and remove Yield_num)
-        materials.define(1, EvpIsoHHypoMaterial)
-        if blade_config.material == 'BE_CU':
-            materials(1).put(MASS_DENSITY, 8.36e-9)
-            materials(1).put(POISSON_RATIO, 0.285)
-            materials(1).put(ELASTIC_MODULUS, 131e3)  # Value
-        elif blade_config.material == 'INVAR':
-            materials(1).put(MASS_DENSITY, 8.1e-9)
-            materials(1).put(POISSON_RATIO, 0.29)
-            materials(1).put(ELASTIC_MODULUS, 141e3)  # Value
+        # Mechanical only - Utiliser ElastHypoMaterial (élastique simple)
+        materials.define(1, ElastHypoMaterial)  # CHANGÉ de ElastPlasticMaterial
+        materials(1).put(MASS_DENSITY, 8.36e-9)
+        materials(1).put(ELASTIC_MODULUS, 131e3)
+        materials(1).put(POISSON_RATIO, 0.285)
+        # Note: Pas de YIELD_NUM car ElastHypoMaterial est élastique uniquement
 
-        materials(1).put(YIELD_NUM, yield_num)
-
-
-        materials.define(2, EvpIsoHHypoMaterial)
-        materials(2).put(MASS_DENSITY, 8.0415e-9)
+        materials.define(2, ElastHypoMaterial)  # CHANGÉ de ElastPlasticMaterial
+        materials(2).put(MASS_DENSITY, 7.93e-9)
         materials(2).put(ELASTIC_MODULUS, 210e3)
         materials(2).put(POISSON_RATIO, 0.3)
-        materials(2).put(YIELD_NUM, 2)
+        # Note: Pas de YIELD_NUM car ElastHypoMaterial est élastique uniquement
 
     # Spring material
     materials.define(4, ConstantSpringMaterial)
@@ -497,10 +451,10 @@ def getMetafor(d={}):
 
     # OPTIMIZED LOADING FUNCTIONS - Smoother and faster convergence
     fctX = PieceWiseLinearFunction()
-    fctX.setData(0.0, 0.0) # Start → 0 move
-    fctX.setData(T_load / 8, 0.0) # t = 1.25s -> always 0
-    fctX.setData(T_load / 2, Dx / (Dx + Dx1)) # t = 5s -> partial displacement (~1 if Dx1=0)
-    fctX.setData(3 * T_load / 4, 1.0) # t = 7.5s -> full displacement
+    fctX.setData(0.0, 0.0)
+    fctX.setData(T_load / 5, 0.0)  # Delayed start for better convergence
+    fctX.setData(T_load / 2, 0.5)  # Progressive loading
+    fctX.setData(3 * T_load / 4, 0.8)
     fctX.setData(T_load, 1.0)
     fctX.setData(12.0, 1.0)
     fctX.setData(T, 1.0)
@@ -521,18 +475,16 @@ def getMetafor(d={}):
     # OPTIMIZED ROTATION FUNCTIONS - Much smoother for better convergence
     fctR = PieceWiseLinearFunction()
     fctR.setData(0.0, 0.0)
-    fctR.setData(T_load / 10, 0.0)
-    fctR.setData(T_load / 2, 1.0)
-    fctR.setData(3 * T_load / 4, 1.0)
+    fctR.setData(T_load / 5, 0.0)  # Delayed start
+    fctR.setData(T_load / 2, 0.5)  # Progressive rotation
+    fctR.setData(3 * T_load / 4, 0.8)
     fctR.setData(T_load, 1.0)
     fctR.setData(12.0, 1.0)
     fctR.setData(T, 1.0)
+
     fctR2 = PieceWiseLinearFunction()
     fctR2.setData(0.0, 0.0)
-    fctR2.setData(T_load / 10, 0.0)
-    fctR2.setData(T_load / 2, 0.0)
-    fctR2.setData(3 * T_load / 4, 0.0)
-    fctR2.setData(T_load, 1.0)
+    fctR2.setData(T_load, 0.0)
     fctR2.setData(12.0, 1.0)
     fctR2.setData(T, 1.0)
 
@@ -543,29 +495,27 @@ def getMetafor(d={}):
         print(f"Configuring OPTIMIZED thermal sequence:")
         print(f"  - Temperature-dependent material properties for Be-Cu")
         print(
-            f"  - Temperature increase: {sim_config.temp_initial_kelvin - 273.15:.0f}C ->  {sim_config.temp_final_kelvin - 273.15:.0f}C")
+            f"  - Temperature increase: {sim_config.temp_initial_kelvin - 273.15:.0f}°C → {sim_config.temp_final_kelvin - 273.15:.0f}°C")
 
         # Initial temperature conditions - IMPORTANT: Both absolute and relative
-        Tabs = sim_config.temp_initial_kelvin  # Use initial temp as absolute reference
+        Tabs = 0.0  # Absolute temperature reference
 
         initcondset = metafor.getDomain().getInitialConditionSet()
         # Set initial conditions for all sides
         for side_num in [1, 2, 3, 4, 5]:
             side = sideset(side_num)
-            initcondset.define(side, Field1D(TO, AB), Tabs)  # Absolute reference
-            initcondset.define(side, Field1D(TO, RE), 0.0)  # Start at 0 relative to reference
+            initcondset.define(side, Field1D(TO, AB), Tabs)  # Absolute temperature
+            initcondset.define(side, Field1D(TO, RE), sim_config.temp_initial_kelvin)  # Relative temperature
 
-            # CORRECTED thermal loading function
+        # Thermal loading function - OPTIMIZED
         fctT = PieceWiseLinearFunction()
-        fctT.setData(0.0, 0.0)  # Start at reference (20C)
-        fctT.setData(sim_config.loading_time, 0.0)  # No thermal change during mechanical loading
-        fctT.setData(sim_config.temp_start_time, 0.0)  # Start thermal loading
-        # CRITICAL: Relative temperature change from reference
-        temp_delta = sim_config.temp_final_kelvin - sim_config.temp_initial_kelvin
-        fctT.setData(sim_config.temp_end_time, temp_delta)  # +30K relative change
-        fctT.setData(sim_config.final_time, temp_delta)  # Maintain final state
+        fctT.setData(0.0, sim_config.temp_initial_kelvin)  # 293.15K (20°C)
+        fctT.setData(sim_config.loading_time, sim_config.temp_initial_kelvin)  # Maintain during mechanical loading
+        fctT.setData(sim_config.temp_start_time, sim_config.temp_initial_kelvin)  # Start thermal change
+        fctT.setData(sim_config.temp_end_time, sim_config.temp_final_kelvin)  # End thermal change (50C)
+        fctT.setData(sim_config.final_time, sim_config.temp_final_kelvin)  # Maintain final temperature
 
-        # Apply thermal loading
+        # Apply thermal loading to all relevant sides
         for side_num in [1, 2, 3, 4, 5]:
             side = sideset(side_num)
             domain.getLoadingSet().define(side, Field1D(TO, RE), 1.0, fctT)
@@ -596,8 +546,8 @@ def getMetafor(d={}):
     # OPTIMIZED TIME INTEGRATION - Key for performance improvement
     if sim_config.enable_thermal:
         # Mechanical time integration - OPTIMIZED for stability
-        tiMech = AlphaGeneralizedTimeIntegration(metafor)  #----------------------------------------------Line change (quasistatic -> ALPHA)
-        # Note: convergence control via iteration handlers rather than setMaxNumberOfLoadIncrements
+        tiMech = AlphaGeneralizedTimeIntegration(metafor)  #----------------------------------------------Ligne changé (quasistatic -> ALPHA°
+        # Note: Contrôle de la convergence via les gestionnaires d'itération plutôt que setMaxNumberOfLoadIncrements
 
         # Thermal time integration - OPTIMIZED parameters
         tiTher = TrapezoidalThermalTimeIntegration(metafor)
@@ -606,49 +556,40 @@ def getMetafor(d={}):
         # Staggered integration - OPTIMIZED coupling
         ti = StaggeredTmTimeIntegration(metafor)
         ti.setIsAdiabatic(False)
-        ti.setWithStressReevaluation(False)  # Re-evaluate stress after thermal at the expense of time
-        # True = stronger but slower coupling
-        # False = weaker but faster coupling
+        ti.setWithStressReevaluation(False)  # Avoid expensive stress re-evaluation
         ti.setMechanicalTimeIntegration(tiMech)
         ti.setThermalTimeIntegration(tiTher)
         metafor.setTimeIntegration(ti)
-
 
         # Thermal iteration manager - OPTIMIZED for convergence
         tim = metafor.getThermalIterationManager()
         tim.setResidualComputationMethod(Method4ResidualComputation())
         tim.setMaxNbOfIterations(15)  # Increased for thermal stability
-        tim.setResidualTolerance(1e-5)
+        tim.setResidualTolerance(1e-4)
 
     else:
         # Pure mechanical - faster integration
         ti = AlphaGeneralizedTimeIntegration(metafor)
         metafor.setTimeIntegration(ti)
 
-    # TIME STEP MANAGEMENT - CRITICAL FOR PERFORMANCE - REFINED
+    # TIME STEP MANAGEMENT - CRITICAL FOR PERFORMANCE
     tsm = metafor.getTimeStepManager()
-    tsm.setInitialTime(0.0, 0.01)  # Smaller initial step for better convergence
+    tsm.setInitialTime(0.0, 0.02)  # Larger initial step
 
-    # ADAPTIVE TIME STEPPING based on simulation phases - ENHANCED
+    # ADAPTIVE TIME STEPPING based on simulation phases
     if sim_config.enable_thermal:
-        # Phase 1: Mechanical loading (0 to T_load) - progressive refinement
-        tsm.setNextTime(sim_config.loading_time * 0.25, 12, 0.01)  # Early loading Up to 2.5s
-        tsm.setNextTime(sim_config.loading_time * 0.5, 12, 0.005)  # Mid loading Up to 5s
-        tsm.setNextTime(sim_config.loading_time * 0.75, 25, 0.005)  # Late loading Up to 7.5s
-        tsm.setNextTime(sim_config.loading_time, 25, 0.005)  # Final mechanical phase Up to 10s
+        # Phase 1: Mechanical loading (0 to T_load) - can use larger steps
+        tsm.setNextTime(sim_config.loading_time * 0.5, 5, 0.1)  # Progressive loading
+        tsm.setNextTime(sim_config.loading_time, 10, 0.05)  # Final mechanical phase
 
-        # Phase 2: Stabilization (T_load to temp_start_time) - MUCH SMALLER STEPS
-        # This phase is critical for convergence
-        tsm.setNextTime(sim_config.loading_time + 1.0, 10, 0.01)  # First second after loading Up to 11s
-        tsm.setNextTime(sim_config.loading_time + 2.5, 15, 0.02)  # Intermediate stabilization Up to 12.5s
-        tsm.setNextTime(sim_config.temp_start_time - 2.0, 11, 0.05)  # Pre-thermal Up to 18s
-        tsm.setNextTime(sim_config.temp_start_time, 4, 0.05)  # Just before thermal Up to 20s
+        # Phase 2: Stabilization (T_load to temp_start_time) - larger steps OK
+        tsm.setNextTime(sim_config.temp_start_time, 5, 0.2)  # Fast stabilization
 
         # Phase 3: Thermal loading (temp_start_time to temp_end_time) - adaptive steps
         thermal_duration = sim_config.temp_end_time - sim_config.temp_start_time
-        tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.1, 3, 0.05)  # Thermal start Up to 21.5s
-        tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.5, 12, 0.05)  # Mid thermal Up to 27.5s
-        tsm.setNextTime(sim_config.temp_end_time, 37, 0.02)  # End thermal - finest steps Up to 35s
+        tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.1, 10, 0.1)  # Start thermal
+        tsm.setNextTime(sim_config.temp_start_time + thermal_duration * 0.5, 15, 0.05)  # Mid thermal
+        tsm.setNextTime(sim_config.temp_end_time, 20, 0.02)  # End thermal - finest steps
 
         # Phase 4: Final phase - can use larger steps again
         if sim_config.temp_end_time < sim_config.final_time:
@@ -656,22 +597,18 @@ def getMetafor(d={}):
 
     else:
         # Pure mechanical - simpler time stepping
-        tsm.setNextTime(T_load * 0.5, 25, 0.01)
-        tsm.setNextTime(T_load, 50, 0.005)
-        tsm.setNextTime(T, 40, 0.05)
+        tsm.setNextTime(T_load * 0.5, 5, 0.1)
+        tsm.setNextTime(T_load,5, 0.05)
+        tsm.setNextTime(T, 3, 0.2)
 
     # TOLERANCE MANAGEMENT - ADAPTIVE for different phases
     fct_TOL = PieceWiseLinearFunction()
     fct_TOL.setData(0.0, 1.0)  # Standard tolerance for mechanical
-    fct_TOL.setData(sim_config.loading_time * 0.75, 0.05)  # Tighter end of loading
-    fct_TOL.setData(sim_config.loading_time, 0.03)  # Strict for transition
-    fct_TOL.setData(sim_config.loading_time + 1.0, 0.01)  # Tres strict stabilisation
-    fct_TOL.setData(sim_config.loading_time + 2.5, 0.005)  # Maximum stricte 7.5-12s
-    fct_TOL.setData(sim_config.temp_start_time - 1.0, 0.01)  # Relachement progressif
-    fct_TOL.setData(sim_config.temp_start_time, 0.01)  # Standard pour thermal
+    fct_TOL.setData(sim_config.loading_time, 1.0)
 
     if sim_config.enable_thermal:
         # Stricter tolerance during thermal phase due to large temperature gradients
+        fct_TOL.setData(sim_config.temp_start_time, 0.5)  # Tighter for thermal start
         fct_TOL.setData(sim_config.temp_start_time + (sim_config.temp_end_time - sim_config.temp_start_time) * 0.5,
                         0.2)  # Tightest mid-thermal
         fct_TOL.setData(sim_config.temp_end_time, 0.5)  # Relax after thermal
@@ -679,43 +616,26 @@ def getMetafor(d={}):
     else:
         fct_TOL.setData(T, 1.0)
 
-    # MECHANICAL ITERATION MANAGER - OPTIMIZED with compatibility management
+    # MECHANICAL ITERATION MANAGER - OPTIMIZED avec gestion de compatibilité
     mim = metafor.getMechanicalIterationManager()
-    mim.setResidualComputationMethod(Method4ResidualComputation()) #----------------------------------------------Line added
-    # Stricter parameters for plasticity
-    # ENHANCED CONVERGENCE CONTROL for critical phases
-    fct_MaxIter = PieceWiseLinearFunction()
-    fct_MaxIter.setData(0.0, 25.0)  # Standard for the start
-    fct_MaxIter.setData(sim_config.loading_time * 0.75, 35.0) # More iterations until the end loading
-    fct_MaxIter.setData(sim_config.loading_time, 40.0) # Max for transition
-    fct_MaxIter.setData(sim_config.loading_time + 2.5, 35.0) # Critical stabilization
-    fct_MaxIter.setData(sim_config.temp_start_time, 30.0) # Normal return before thermal
-    fct_MaxIter.setData(sim_config.temp_end_time, 40.0) # Max pendant thermal
-    fct_MaxIter.setData(sim_config.final_time, 25.0)  # Standard until the end
-
-    # Apply adaptive iteration control
-    try:
-        mim.setMaxNbOfIterations(40, fct_MaxIter)  # Adaptive function
-        print("Adaptive iteration control set successfully")
-    except (AttributeError, TypeError):
-        print("Using fixed iteration control")
-        mim.setMaxNbOfIterations(40)  # Fallback fixe plus eleve
-
-    mim.setResidualTolerance(5e-5, fct_TOL)
+    mim.setResidualComputationMethod(Method4ResidualComputation()) #----------------------------------------------Ligne ajoutée
+    # Paramètres plus stricts pour la plasticité
+    mim.setMaxNbOfIterations(35)  # Augmenté de 25 à 35
+    mim.setResidualTolerance(5e-5, fct_TOL)  # Plus strict : de 1e-4 à 5e-5
     mim.setPredictorComputationMethod(EXTRAPOLATION_MRUA)  # Better prediction
 
-    # Line search method - with compatibility management for different versions
+    # Line search method - avec gestion de compatibilité pour différentes versions
     try:
         mim.setLineSearchMethod(LINESEARCH_ARMIJO)  # Robust line search
         print("Line search method set successfully")
     except AttributeError:
         print("Line search method not available in this Metafor version - using default")
-        # Alternative: try other possible names
+        # Alternative: essayer d'autres noms possibles
         try:
             mim.setLineSearch(LINESEARCH_ARMIJO)
         except AttributeError:
             try:
-                # Other possibilities depending on version
+                # Autre possibilité selon la version
                 mim.enableLineSearch(True)
             except AttributeError:
                 print("No line search method available - continuing with default settings")
@@ -729,7 +649,7 @@ def getMetafor(d={}):
         # If not available, rely on time step control and iteration limits
         print("Using time step control for load increment management")
         try:
-            # Essayer d'autres methodes possibles
+            # Essayer d'autres méthodes possibles
             mim.setMaxNumberOfLoadIncrements(50)
         except AttributeError:
             print("No load increment control available - using time step control only")
@@ -741,15 +661,15 @@ def getMetafor(d={}):
     except AttributeError:
         print("Auto-remeshing not available in this version")
 
-    # Additional stability settings pour ameliorer la convergence
+    # Additional stability settings pour améliorer la convergence
     try:
-        # More robust convergence parameters
+        # Paramètres de convergence plus robustes
         mim.setResidualComputationMethod(Method4ResidualComputation())
     except AttributeError:
         print("Residual computation method not available - using default")
 
     try:
-        # Charge increment control
+        # Contrôle de l'incrément de charge
         mim.setConvergenceAccelerationMethod(CONVERGENCE_AITKEN)
     except AttributeError:
         print("Convergence acceleration not available - using default")
@@ -774,7 +694,7 @@ def getMetafor(d={}):
         ext_becu = IFNodalValueExtractor(interactionset(1), IF_EVMS)
         hcurves.add(9, ext_becu, MaxOperator(), 'Max_VonMises_BeCu')
 
-        # Mass corner displacements - KEY for the analysis
+        # Mass corner displacements - KEY for your analysis
         hcurves.add(10, DbNodalValueExtractor(p10, Field1D(TY, RE)), SumOperator(), 'dispY_Bottom_left_mass')
         hcurves.add(11, DbNodalValueExtractor(p11, Field1D(TY, RE)), SumOperator(), 'dispY_Bottom_right_mass')
         hcurves.add(12, DbNodalValueExtractor(p12, Field1D(TY, RE)), SumOperator(), 'dispY_Top_right_mass')
@@ -783,7 +703,7 @@ def getMetafor(d={}):
         # X displacements for thermal effects
         hcurves.add(14, DbNodalValueExtractor(p20, Field1D(TX, RE)), SumOperator(), 'dispX_rod_end')
 
-        # THERMAL EXTRACTORS - Critical for the study
+        # THERMAL EXTRACTORS - Critical for your study
         if sim_config.enable_thermal:
             # Temperature monitoring
             hcurves.add(15, DbNodalValueExtractor(s1, Field1D(TO, RE)), MeanOperator(), 'temp_mean_blade_K')
@@ -806,21 +726,19 @@ def getMetafor(d={}):
             hcurves.add(24, DbNodalValueExtractor(p3, Field1D(TY, RE)), SumOperator(), 'dispY_blade_tip')
 
         # Validation of extractors
-        # Plastic strain extractors to monitor plasticity
-        if sim_config.enable_thermal:
-           hcurves.add(25, IFNodalValueExtractor(interactionset(1), IF_EPL), MaxOperator(),
-                       'max_plastic_strain_blade')
-           hcurves.add(26, IFNodalValueExtractor(interactionset(1), IF_CRITERION), MaxOperator(),
-                       'max_yield_function_blade')
-           hcurves.add(27, IFNodalValueExtractor(interactionset(2), IF_EPL), MaxOperator(),
-                       'max_plastic_strain_structure')
-           max_extractor = 27
-        else:
-           max_extractor = 14
+        # Plastic strain extractors pour surveiller la plasticité
+        #if sim_config.enable_thermal:
+        #    hcurves.add(25, IFNodalValueExtractor(interactionset(1), IF_PLASTIC_STRAIN), MaxOperator(),
+        #                'max_plastic_strain_blade')
+        #    hcurves.add(26, IFNodalValueExtractor(interactionset(1), IF_YIELD_FUNCTION), MaxOperator(),
+        #                'max_yield_function_blade')
+        #    hcurves.add(27, IFNodalValueExtractor(interactionset(2), IF_PLASTIC_STRAIN), MaxOperator(),
+        #                'max_plastic_strain_structure')
+        #    max_extractor = 27
+        #else:
+        #    max_extractor = 14
 
-        #If only elastic , use those :
-        # max_extractor = 24 if sim_config.enable_thermal else 14
-
+        max_extractor = 24 if sim_config.enable_thermal else 14
         for i in range(1, max_extractor + 1):
             metafor.getTestSuiteChecker().checkExtractor(i)
 
@@ -852,7 +770,7 @@ def getMetafor(d={}):
 
                 win2 = VizWin()
                 win2.add(plot2)
-                win2.setPlotTitle("Temperature Evolution - Be-Cu Blade (10C -> 50C)")
+                win2.setPlotTitle("Temperature Evolution - Be-Cu Blade (10°C → 50°C)")
                 win2.setPlotXLabel("Time [s]")
                 win2.setPlotYLabel("Temperature [K]")
                 metafor.addObserver(win2)
@@ -893,9 +811,6 @@ def getMetafor(d={}):
     return metafor
 
 
-
-
-
 # ----------------------------------------------------------------------------------
 # OPTIMIZED Modal analysis with thermal effects consideration
 from toolbox.utilities import *
@@ -915,9 +830,10 @@ def postpro():
     metafor = instance(p)
     domain = metafor.getDomain()
 
-    # This loads the last available state WITHOUT forcing continuous recording
+    # CORRECTION: Utiliser load() sans paramètre comme dans votre ancien code
+    # Cela charge le dernier état disponible SANS forcer l'enregistrement continu
     loader = fac.FacManager(metafor)
-    loader.load()  # No parameters = loads last available state
+    loader.load()  # Sans paramètre = charge le dernier état disponible
 
     print('\n=== CORRECTED MODAL ANALYSIS AFTER THERMAL LOADING ===')
 
@@ -930,9 +846,9 @@ def postpro():
     lanczos.setComputeEigenVectors(True)
     lanczos.setWriteMatrix2Matlab(True)
 
-    # Remove unsupported methods - these don't exist in Metafor API:
-    # lanczos.setTolerance(1e-12)        # <- This was causing the error
-    # lanczos.setMaxIterations(1000)     # <- This might not exist either
+    # Paramètres plus précis pour l'analyse modale
+    lanczos.setTolerance(1e-12)
+    lanczos.setMaxIterations(1000)
 
     print('Computing eigenvalues on thermally deformed structure...')
     print('(Analysis performed on final thermal state)')
@@ -941,8 +857,11 @@ def postpro():
         lanczos.execute()
         lanczos.writeTSC()
 
-        # Frequency extraction
+        # Extraction des fréquences
         curves.add(11, FrequencyAnalysisValueExtractor(lanczos), 'freqs_thermal_corrected')
+
+        # CORRECTION: Utiliser une approche plus robuste pour l'extraction
+        # Au lieu de fillNow qui peut causer des problèmes, on fait l'extraction directement
 
         print('\n--- EIGENVALUE RESULTS (Direct extraction) ---')
         eigenvalues = []
@@ -952,17 +871,13 @@ def postpro():
             eigenval = lanczos.getEigenValue(i)
 
             if eigenval > 0:
-                # eigenval from Metafor is actually frequency in Hz, not eigenvalue
-                frequency_hz = eigenval  # This is the frequency
+                eigenvalues.append(eigenval)
+                frequency_hz = math.sqrt(eigenval) / (2 * math.pi)
                 frequencies_hz.append(frequency_hz)
 
-                # Calculate the TRUE eigenvalue: ω² = (2πf)²
-                true_eigenvalue = (2 * math.pi * frequency_hz) ** 2
-                eigenvalues.append(true_eigenvalue)
+                print(f'Mode {i + 1}: Eigenvalue = {eigenval:.8e}, Frequency = {frequency_hz:.4f} Hz')
 
-                print(f'Mode {i + 1}: Frequency = {frequency_hz:.4f} Hz, True Eigenvalue = {true_eigenvalue:.8e}')
-
-                # Display
+                # Affichage du mode (optionnel)
                 lanczos.showEigenVector(i)
 
                 if i == 0:
@@ -979,28 +894,25 @@ def postpro():
             else:
                 print(f'Mode {i + 1}: Invalid eigenvalue = {eigenval:.6e}')
 
-        # Save and verify results
+        # Sauvegarde des résultats (optionnelle)
         try:
-            # Fill curves with current results
-            curves.fillNow(metafor.getCurrentStepNo())
             curves.toAscii()
             curves.flush()
 
-            # Read generated file for verification
+            # Lecture du fichier généré pour vérification
             with open('freqs_thermal_corrected.ascii') as f:
                 txt = f.readlines()
             freq_values = [float(v) for v in txt[0].strip().split()]
 
             print(f'\n--- FILE VERIFICATION ---')
-            print(f'Saved frequencies = {[f"{v:.4f} Hz" for v in freq_values[:5]]}')
-            # Calculate true eigenvalues from saved frequencies
-            true_eigenvals = [(2 * math.pi * val) ** 2 for val in freq_values[:5] if val > 0]
-            print(f'True eigenvalues = {[f"{v:.6e}" for v in true_eigenvals]}')
+            print(f'Saved eigenvalues = {[f"{v:.6e}" for v in freq_values[:5]]}')
+            file_frequencies = [math.sqrt(abs(val)) / (2 * math.pi) for val in freq_values[:5] if val > 0]
+            print(f'File frequencies = {[f"{f:.4f} Hz" for f in file_frequencies]}')
 
         except Exception as e:
             print(f"File operations failed (non-critical): {e}")
 
-        # Summary
+        # Résumé final
         if frequencies_hz:
             print(f'\n=== THERMAL EFFECT SUMMARY ===')
             print(f'First natural frequency: {frequencies_hz[0]:.4f} Hz')
@@ -1017,200 +929,13 @@ def postpro():
         print('1. Thermal state not properly converged')
         print('2. Excessive deformation affecting stiffness matrix')
         print('3. Numerical conditioning issues')
-        print('4. Missing math import (add: import math at the top)')
-
-
-# Alternative simpler version (closer to your working code):
-def postpro_simple():
-    """
-    Simplified version similar to your working code but with thermal state loading
-    """
-    import os.path
-    import math  # Make sure math is imported
-
-    setDir('workspace/%s' % os.path.splitext(os.path.basename(__file__))[0])
-    load(__name__)
-
-    p = {}
-    p['postpro'] = True
-    metafor = instance(p)
-    domain = metafor.getDomain()
-
-    # Load the last archive (thermal state)
-    loader = fac.FacManager(metafor)
-    loader.load()
-
-    # Set up curves
-    curves = metafor.getValuesManager()
-
-    # Configure Lanczos analysis
-    lanczos = LanczosFrequencyAnalysisMethod(domain)
-    lanczos.setNumberOfEigenValues(8)  # More modes for better analysis
-    lanczos.setSpectralShifting(0.0)
-    lanczos.setComputeEigenVectors(True)
-    lanczos.setWriteMatrix2Matlab(True)
-
-    print('\n=== Modal Analysis on Thermal State ===')
-    print('Computing Eigenvalues...')
-
-    # Execute analysis
-    lanczos.execute()
-    lanczos.writeTSC()
-
-    # Add to curves
-    curves.add(11, FrequencyAnalysisValueExtractor(lanczos), 'freqs_thermal')
-
-    # Fill and save
-    curves.fillNow(metafor.getCurrentStepNo())
-    curves.toAscii()
-    curves.flush()
-
-    # Display results
-    print('\n--- Results ---')
-    for i in range(min(8, lanczos.getNumberOfEigenValues())):
-        eigenval = lanczos.getEigenValue(i)
-        if eigenval > 0:
-            frequency_hz = eigenval  # eigenval is actually frequency in Hz
-            true_eigenvalue = (2 * math.pi * frequency_hz) ** 2  # Calculate true eigenvalue
-            print(f'Mode {i + 1}: Frequency = {frequency_hz:.4f} Hz, True Eigenvalue = {true_eigenvalue:.6e}')
-
-            if i == 0:  # First mode comparison
-                expected = 2.91
-                error = abs(frequency_hz - expected) / expected * 100
-                print(f'  (Expected ~{expected} Hz, Error: {error:.1f}%)')
-        else:
-            print(f'Mode {i + 1}: Invalid eigenvalue = {eigenval:.6e}')
-
-    # Read and verify saved file
-    try:
-        with open('freqs_thermal.ascii') as f:
-            txt = f.readlines()
-        frequencies = [float(v) for v in txt[0].strip().split()]
-        true_eigenvalues = [(2 * math.pi * f) ** 2 for f in frequencies]
-        print(f'\nSaved frequencies: {[f"{f:.4f} Hz" for f in frequencies[:5]]}')
-        print(f'True eigenvalues: {[f"{ev:.6e}" for ev in true_eigenvalues[:5]]}')
-    except Exception as e:
-        print(f'Could not read output file: {e}')
-
-
-# Visualization version (if you want to see mode shapes)
-def postpro_with_viz():
-    """
-    Version with visualization like your original working code
-    """
-    import os.path
-    import math
-
-    setDir('workspace/%s' % os.path.splitext(os.path.basename(__file__))[0])
-    load(__name__)
-
-    p = {}
-    p['postpro'] = True
-    metafor = instance(p)
-    domain = metafor.getDomain()
-
-    # Load thermal state
-    loader = fac.FacManager(metafor)
-    loader.load()
-
-    curves = metafor.getValuesManager()
-
-    lanczos = LanczosFrequencyAnalysisMethod(domain)
-    lanczos.setNumberOfEigenValues(8)
-    lanczos.setSpectralShifting(0.0)
-    lanczos.setComputeEigenVectors(True)
-    lanczos.setWriteMatrix2Matlab(True)
-
-    lanczos.execute()
-    lanczos.writeTSC()
-    curves.add(11, FrequencyAnalysisValueExtractor(lanczos), 'freqs_thermal_viz')
-
-    curves.fillNow(metafor.getCurrentStepNo())
-    curves.toAscii()
-    curves.flush()
-
-    # Visualization setup
-    win = VizWin()
-    for i in range(domain.getInteractionSet().size()):
-        win.add(domain.getInteractionSet().getInteraction(i))
-
-    # Show each mode
-    for i in range(min(3, lanczos.getNumberOfEigenValues())):
-        eigenval = lanczos.getEigenValue(i)
-        if eigenval > 0:
-            frequency_hz = eigenval  # eigenval is actually frequency in Hz
-            true_eigenvalue = (2 * math.pi * frequency_hz) ** 2  # Calculate true eigenvalue
-            lanczos.showEigenVector(i)
-            win.update()
-            print(f'Eigen Vector {i}, Frequency = {frequency_hz:.4f} Hz, True Eigenvalue = {true_eigenvalue:.6e}')
-            input("Press enter to continue to next mode...")
-        else:
-            print(f'Skipping mode {i}: invalid eigenvalue = {eigenval:.6e}')
-
-    # Final results
-    with open('freqs_thermal_viz.ascii') as f:
-        txt = f.readlines()
-    frequencies = [float(v) for v in txt[0].strip().split()]
-    true_eigenvalues = [(2 * math.pi * f) ** 2 for f in frequencies]
-    print(f'\nFinal frequencies = {frequencies[:5]}')
-    print(f'Final true eigenvalues = {true_eigenvalues[:5]}')
-
-def postpro_initial():
-    import os.path
-    setDir('workspace/%s' % os.path.splitext(os.path.basename(__file__))[0])
-    load(__name__)
-
-    p = {}
-    p['postpro'] = True
-    metafor = instance(p)
-    domain = metafor.getDomain()
-
-    # set new curves
-    curves = metafor.getValuesManager()
-
-    lanczos = LanczosFrequencyAnalysisMethod(domain)
-    lanczos.setNumberOfEigenValues(3)
-    lanczos.setSpectralShifting(0.0)
-    lanczos.setComputeEigenVectors(True)
-    lanczos.setWriteMatrix2Matlab(True)
-
-    # load the last archive
-    loader = fac.FacManager(metafor)
-    loader.load()
-
-    lanczos.execute()
-    lanczos.writeTSC()
-    fExtr = FrequencyAnalysisValueExtractor(lanczos)
-    curves.add(11, FrequencyAnalysisValueExtractor(lanczos), 'freqs')
-
-    # extraction
-    print('\nComputing Eigenvalues...')
-    curves.fillNow(metafor.getCurrentStepNo())
-    curves.toAscii()
-    curves.flush()
-
-    win = VizWin()
-    for i in range(domain.getInteractionSet().size()):
-        win.add(domain.getInteractionSet().getInteraction(i))
-    for i in range(3):
-        lanczos.showEigenVector(i)
-        win.update()
-        print('Eigen Vector ', i, 'EigenValue = ', lanczos.getEigenValue(i))
-        input("press enter to continue")
-
-    with open('freqs.ascii') as f:
-        txt = f.readlines()
-
-    print(f'eigenvalues = {[float(v) for v in txt[0].strip().split()]}')
 
 
 def additional_diagnostics():
-    """Additional diagnostics to verify thermal condition with comprehensive analysis"""
-    import os
-
+    """Diagnostics supplémentaires pour vérifier l'état thermique"""
     print('\n=== THERMAL STATE DIAGNOSTICS ===')
 
-    # Verification of thermal output files (original code)
+    # Vérification des fichiers de sortie thermique
     thermal_files = {
         'temp_mean_blade_K.ascii': 'Mean blade temperature',
         'thermal_strain_max_blade.ascii': 'Maximum thermal strain',
@@ -1231,7 +956,7 @@ def additional_diagnostics():
                     if 'temp' in filename:
                         if 'K' in filename:
                             final_celsius = final_value - 273.15
-                            print(f'{description}: {final_celsius:.1f}C (final)')
+                            print(f'{description}: {final_celsius:.1f}°C (final)')
                         else:
                             print(f'{description}: {final_value:.6e} (final)')
                     else:
@@ -1244,142 +969,45 @@ def additional_diagnostics():
 
     print('\n--- THERMAL LOADING VERIFICATION ---')
     print('Expected effects:')
-    print('- Temperature change: 10C -> 50C (40C increase)')
-    print('- Thermal strain: ~40C x 17e-6/C = 6.8e-4')
+    print('- Temperature change: 10°C → 50°C (40°C increase)')
+    print('- Thermal strain: ~40°C × 17e-6/°C = 6.8e-4')
     print('- Frequency shift due to thermal expansion and stiffness change')
 
-    # ENHANCED THERMAL ANALYSIS
-    print('\n=== COMPREHENSIVE THERMAL ANALYSIS ===')
 
-    # Read time data for correlation
-    time_values = []
+# Version alternative simplifiée si des problèmes persistent
+def simple_modal_check():
+    """Version ultra-simple pour diagnostic rapide"""
+    print('\n=== SIMPLE MODAL CHECK ===')
+
+    p = {}
+    p['postpro'] = True
+    metafor = instance(p)
+    domain = metafor.getDomain()
+
+    # Chargement de l'état final
+    loader = fac.FacManager(metafor)
+    loader.load()
+
+    # Analyse modale basique
+    lanczos = LanczosFrequencyAnalysisMethod(domain)
+    lanczos.setNumberOfEigenValues(3)
+
     try:
-        with open('time.ascii', 'r') as f_time:
-            time_values = [float(line.strip()) for line in f_time if line.strip()]
-        print(f"Time steps analyzed: {len(time_values)}")
-    except:
-        print("Warning: Could not read time.ascii")
+        lanczos.execute()
 
-    # Von Mises stress analysis
-    stress_files = {
-        "Be-Cu Blade": 'Max_VonMises_BeCu.ascii',
-    }
-
-    print('\n--- STRESS ANALYSIS ---')
-    for material, filename in stress_files.items():
-        if os.path.exists(filename):
-            with open(filename, 'r') as f:
-                values = [float(line.strip()) for line in f if line.strip()]
-
-            if values and time_values and len(time_values) == len(values):
-                max_stress = max(values)
-                max_stress_time = time_values[values.index(max_stress)]
-                final_stress = values[-1]
-
-                print(f"{material}:")
-                print(f"  Maximum stress: {max_stress:.2f} MPa at t = {max_stress_time:.2f} s")
-                print(f"  Final stress: {final_stress:.2f} MPa")
-                print(f"  Stress evolution: {values[0]:.2f} → {final_stress:.2f} MPa")
-        else:
-            print(f"Warning: {filename} not found")
-
-    # Temperature analysis
-    temp_files = {
-        "Mean Temperature": 'temp_mean_blade_K.ascii',
-        "Max Temperature": 'temp_max_blade_K.ascii',
-        "Min Temperature": 'temp_min_blade_K.ascii',
-        "Blade Tip Temperature": 'temp_blade_tip_K.ascii'
-    }
-
-    print('\n--- TEMPERATURE ANALYSIS ---')
-    for temp_type, filename in temp_files.items():
-        if os.path.exists(filename):
-            with open(filename, 'r') as f:
-                values = [float(line.strip()) for line in f if line.strip()]
-
-            if values:
-                # Convert to Celsius
-                initial_C = values[0] - 273.15
-                final_C = values[-1] - 273.15
-                delta_T = final_C - initial_C
-
-                print(f"{temp_type}:")
-                print(f"  Initial: {initial_C:.1f}°C ({values[0]:.1f}K)")
-                print(f"  Final: {final_C:.1f}°C ({values[-1]:.1f}K)")
-                print(f"  Change: ΔT = {delta_T:.1f}°C")
-
-    # Thermal strain analysis
-    strain_files = {
-        "Mean Thermal Strain": 'thermal_strain_mean_blade.ascii',
-        "Max Thermal Strain": 'thermal_strain_max_blade.ascii'
-    }
-
-    print('\n--- THERMAL STRAIN ANALYSIS ---')
-    for strain_type, filename in strain_files.items():
-        if os.path.exists(filename):
-            with open(filename, 'r') as f:
-                values = [float(line.strip()) for line in f if line.strip()]
-
-            if values:
-                initial_strain = values[0]
-                final_strain = values[-1]
-                max_strain = max(values)
-
-                print(f"{strain_type}:")
-                print(f"  Initial: {initial_strain:.2e}")
-                print(f"  Final: {final_strain:.2e}")
-                print(f"  Maximum: {max_strain:.2e}")
-                print(f"  Change: Δε = {final_strain - initial_strain:.2e}")
-
-    # Displacement analysis - KEY for sensor performance
-    disp_files = {
-        "Rod End Y": 'displacement_rod_end_Y.ascii',
-        "Rod End X": 'dispX_rod_end.ascii',
-        "Mass Top Right X": 'thermal_dispX_mass_top_right.ascii',
-        "Mass Top Right Y": 'thermal_dispY_mass_top_right.ascii',
-        "Blade Tip X": 'dispX_blade_tip.ascii',
-        "Blade Tip Y": 'dispY_blade_tip.ascii'
-    }
-
-    print('\n--- DISPLACEMENT ANALYSIS (SENSOR RESPONSE) ---')
-    for disp_type, filename in disp_files.items():
-        if os.path.exists(filename):
-            with open(filename, 'r') as f:
-                values = [float(line.strip()) for line in f if line.strip()]
-
-            if values:
-                initial_disp = values[0]
-                final_disp = values[-1]
-                max_disp = max(values)
-                thermal_effect = final_disp - initial_disp
-
-                print(f"{disp_type}:")
-                print(f"  Initial: {initial_disp:.6f} mm")
-                print(f"  Final: {final_disp:.6f} mm")
-                print(f"  Maximum: {max_disp:.6f} mm")
-                print(f"  Thermal effect: Δ = {thermal_effect:.6f} mm")
-
-                if abs(thermal_effect) > 1e-6:
-                    print(f"  *** SIGNIFICANT THERMAL DISPLACEMENT: {thermal_effect:.3f} mm ***")
-
-    print('\n=== SENSOR PERFORMANCE SUMMARY ===')
-    print(f"This simulation demonstrates the muVINS sensor response to:")
-    print(f"1. Mechanical pre-loading (blade bending)")
-    print(f"2. Large temperature change (10°C → 50°C)")
-    print(f"3. Resulting thermal expansion/contraction effects")
-    print(f"4. Mass displacement due to thermal-mechanical coupling")
-    print(f"\nThe thermal effects on mass position are critical for")
-    print(f"gravitational wave detection sensitivity.")
-    print('=' * 60)
-
+        for i in range(3):
+            eigenval = lanczos.getEigenValue(i)
+            if eigenval > 0:
+                freq = math.sqrt(eigenval) / (2 * math.pi)
+                print(f'Mode {i + 1}: {freq:.4f} Hz')
+    except Exception as e:
+        print(f'Simple modal analysis failed: {e}')
 
 
 if __name__ == "__main__":
-    # Main analysis : Only one at a time
+    # Analyse principale
     postpro()
-    #postpro_simple() # Initial way to obtain the modal analysis
-    #postpro_with_viz() # Modal analysys with graphs
-    #postpro_initial() #Post pro of morgan code
-
     additional_diagnostics()
 
+    # Vérification simple en cas de problème
+    # simple_modal_check()

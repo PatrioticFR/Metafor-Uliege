@@ -473,6 +473,7 @@ def getMetafor(d={}):
         materials(mat_id).put(THERM_EXPANSION, blade_material['thermal_expansion'])
         materials(mat_id).put(REFERENCE_TEMPERATURE, sim_config.temp_initial)
 
+
         fct_Temp = PieceWiseLinearFunction()
         fct_Temp.setData(0.0, sim_config.temp_initial)
         fct_Temp.setData(sim_config.temp_start_time, sim_config.temp_initial)

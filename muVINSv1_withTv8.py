@@ -50,10 +50,10 @@ class SimulationConfig:
         self.loading_time = 10.0  # T_load - Mechanical loading up to 10s
         self.stabilization_time = 12.0  # Time when system is stabilized
 
-        # Temperature parameters - MODIFIED FOR 10C to 50C
+        # Temperature parameters - MODIFIED FOR 10°C to 50°C
         self.enable_thermal = False #True or False
-        self.temp_initial_kelvin = 273.15 + 10.0  # 10C initial
-        self.temp_final_kelvin = 273.15 + 50.0    # 50C final
+        self.temp_initial_kelvin = 273.15 + 10.0  # 10°C initial
+        self.temp_final_kelvin = 273.15 + 50.0    # 50°C final
         self.temp_start_time = 20.0  # Start of thermal change (modified)
         self.temp_end_time = 35.0    # End of thermal change (modified)
 
@@ -69,13 +69,13 @@ def setup_temperature_dependent_properties(material):
 
     if material == 'BE_CU':
         fctE = PieceWiseLinearFunction()
-        fctE.setData(283.15, 131e3)  # 10C
-        fctE.setData(290.15, 130.8e3)  # 17C
-        fctE.setData(293.15, 130.7e3)  # 20C (reference)
-        fctE.setData(300.15, 130.4e3)  # 27C
-        fctE.setData(310.15, 130.0e3)  # 37C
-        fctE.setData(320.15, 129.5e3)  # 47C
-        fctE.setData(323.15, 129.3e3)  # 50C
+        fctE.setData(283.15, 131e3)  # 10°C
+        fctE.setData(290.15, 130.8e3)  # 17°C
+        fctE.setData(293.15, 130.7e3)  # 20°C (reference)
+        fctE.setData(300.15, 130.4e3)  # 27°C
+        fctE.setData(310.15, 130.0e3)  # 37°C
+        fctE.setData(320.15, 129.5e3)  # 47°C
+        fctE.setData(323.15, 129.3e3)  # 50°C
 
         fctCTE = PieceWiseLinearFunction()
         fctCTE.setData(283.15, 17.0e-6)
@@ -363,15 +363,15 @@ def getMetafor(d={}):
             materials(1).put(POISSON_RATIO, 0.285)
             materials(1).put(CONDUCTIVITY, 105.0)
             materials(1).put(HEAT_CAPACITY, 420.e6)
-            materials(1).put(ELASTIC_MODULUS, 131e3)  # Valeur à 10C (283.15K)
-            materials(1).put(THERM_EXPANSION, 17.0e-6)  # Valeur à 10C (283.15K)
+            materials(1).put(ELASTIC_MODULUS, 131e3)  # Valeur à 10°C (283.15K)
+            materials(1).put(THERM_EXPANSION, 17.0e-6)  # Valeur à 10°C (283.15K)
         elif blade_config.material == 'INVAR':
             materials(1).put(MASS_DENSITY, 8.1e-9)
             materials(1).put(POISSON_RATIO, 0.29)
             materials(1).put(CONDUCTIVITY, 10.0)
             materials(1).put(HEAT_CAPACITY, 500.e6)
-            materials(1).put(ELASTIC_MODULUS, 141e3)  # Valeur à 10C (283.15K)
-            materials(1).put(THERM_EXPANSION, 1.1e-6)  # Valeur à 10C (283.15K)
+            materials(1).put(ELASTIC_MODULUS, 141e3)  # Valeur à 10°C (283.15K)
+            materials(1).put(THERM_EXPANSION, 1.1e-6)  # Valeur à 10°C (283.15K)
 
         materials(1).depend(ELASTIC_MODULUS, fctE, Field1D(TO, RE))
         materials(1).depend(THERM_EXPANSION, fctCTE, Field1D(TO, RE))
@@ -400,11 +400,11 @@ def getMetafor(d={}):
         if blade_config.material == 'BE_CU':
             materials(1).put(MASS_DENSITY, 8.36e-9)
             materials(1).put(POISSON_RATIO, 0.285)
-            materials(1).put(ELASTIC_MODULUS, 131e3)  # Valeur à 10C (283.15K)
+            materials(1).put(ELASTIC_MODULUS, 131e3)  # Valeur à 10°C (283.15K)
         elif blade_config.material == 'INVAR':
             materials(1).put(MASS_DENSITY, 8.1e-9)
             materials(1).put(POISSON_RATIO, 0.29)
-            materials(1).put(ELASTIC_MODULUS, 141e3)  # Valeur à 21C (283.15K)
+            materials(1).put(ELASTIC_MODULUS, 141e3)  # Valeur à 21°C (283.15K)
 
         materials(1).put(YIELD_NUM, yield_num)
 
@@ -557,7 +557,7 @@ def getMetafor(d={}):
 
             # CORRECTED thermal loading function
         fctT = PieceWiseLinearFunction()
-        fctT.setData(0.0, 0.0)  # Start at reference (20C)
+        fctT.setData(0.0, 0.0)  # Start at reference (20°C)
         fctT.setData(sim_config.loading_time, 0.0)  # No thermal change during mechanical loading
         fctT.setData(sim_config.temp_start_time, 0.0)  # Start thermal loading
         # CRITICAL: Relative temperature change from reference
@@ -596,7 +596,7 @@ def getMetafor(d={}):
     # OPTIMIZED TIME INTEGRATION - Key for performance improvement
     if sim_config.enable_thermal:
         # Mechanical time integration - OPTIMIZED for stability
-        tiMech = AlphaGeneralizedTimeIntegration(metafor)  #----------------------------------------------Ligne change (quasistatic -> ALPHA)
+        tiMech = AlphaGeneralizedTimeIntegration(metafor)  #----------------------------------------------Ligne changé (quasistatic -> ALPHA°
         # Note: Contrôle de la convergence via les gestionnaires d'itération plutôt que setMaxNumberOfLoadIncrements
 
         # Thermal time integration - OPTIMIZED parameters
@@ -670,7 +670,7 @@ def getMetafor(d={}):
     fct_TOL.setData(sim_config.loading_time, 0.03)  # Strict for transition
     fct_TOL.setData(sim_config.loading_time + 1.0, 0.01)  # Très strict stabilisation
     fct_TOL.setData(sim_config.loading_time + 2.5, 0.005)  # Maximum stricte 7.5-12s
-    fct_TOL.setData(sim_config.temp_start_time - 1.0, 0.01)  # Relachement progressif
+    fct_TOL.setData(sim_config.temp_start_time - 1.0, 0.01)  # Relâchement progressif
     fct_TOL.setData(sim_config.temp_start_time, 0.01)  # Standard pour thermal
 
     if sim_config.enable_thermal:

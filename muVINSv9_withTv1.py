@@ -39,12 +39,12 @@ class BladeConfig:
         self.width_ref = 45.0  # reference width
 
         # Current blade geometry
-        self.thickness = 0.24  # current thickness (e/h)
-        self.length = 93.40 # current length (L)
-        self.width = 41.1  # current width
+        self.thickness = 0.27  # current thickness (e/h)
+        self.length = 105.25 # current length (L)
+        self.width = 20.5  # current width
 
-        # Material selection: 'BE_CU', 'INVAR'
-        self.material = 'INVAR'
+        # Material selection: 'BE_CU', 'INVAR', 'STEEL'
+        self.material = 'BE_CU'
 
         # Mesh parameters for blade - use your existing values
         self.elements_thickness = 8  # elements through thickness (ne)
@@ -53,7 +53,7 @@ class BladeConfig:
         # Reference equilibrium parameters
         self.enc_ref = 57.32
 
-        self.Dx_fixe = True  #Set to True for Dx = -67.5227 or -2 * R - 0.52 (experimental value) and False for Dx to be calculated
+        self.Dx_fixe = False  #Set to True for Dx = -67.5227 or -2 * R - 0.52 (experimental value) and False for Dx to be calculated
 
     def get_elements_length(self):
         return int(self.length * self.elements_length_factor)
@@ -213,7 +213,7 @@ class SimulationConfig:
         self.temp_end_time = 35.0
 
         # Plasticity plots and data
-        self.enable_plasticityData = True  # If True then all the plasticity data will be calculated in the simulation.
+        self.enable_plasticityData = False  # If True then all the plasticity data will be calculated in the simulation.
         # Else only the elastic data will be calculated. Improve the simulation time if put to False
         # /!\ Advice put True for Invar and False for Be-Cu.
 
@@ -360,6 +360,19 @@ def getMetafor(d={}):
     Dx1 = sim_config.Dx1
     angleClamp = sim_config.angleClamp
 
+    # Invar blade
+    ei = 0.25  # invar thickness
+    largeur_invar = 20
+    # Relative position of the blades (horizontal offset of 0.1mm)
+    decalage = 0.1  # offset between the blades
+    rayon_interne_BeCu = enc / 2
+    R_beCu = rayon_interne_BeCu + e / 2  # Median radius of the Be-Cu blade
+    R_invar = rayon_interne_BeCu - decalage - ei / 2  # Median radius of the Invar blade
+    ratio = R_invar / R_beCu
+    Li = L * ratio  # The length must be proportional to the radius for the same bending angle
+    Dx_invar = Dx * ratio  # Adjusted to keep the blades separate when folded
+
+
     # Fixed rod and mass parameters
     l = 79.2  # total length
     H = 3.875  # thickness
@@ -383,7 +396,9 @@ def getMetafor(d={}):
     n14 = 3  # mass vertical 1
     n15 = 17  # mass vertical 2
 
-    # Geometry (unchanged from original)
+
+    # Geometry
+
     geometry = domain.getGeometry()
     geometry.setDimPlaneStrain(1.0)
 
@@ -420,6 +435,7 @@ def getMetafor(d={}):
     # Ground
     p25 = pointset.define(25, h + d + r, -y)
     p26 = pointset.define(26, 0, -y)
+
     p27 = pointset.define(27, Dx + enc, 0.0)
 
     # Middle plane
@@ -428,9 +444,20 @@ def getMetafor(d={}):
     # Spring
     p30 = pointset.define(30, 0.0, -H / 2)
 
+    # New Invar leaf spring (side by side with the Be-Cu blade)
+    p31 = pointset.define(31, enc - ei - decalage, H / 2)  # Bottom left point Invar blade
+    p32 = pointset.define(32, enc - decalage, H / 2)  # Bottom right point Invar blade
+    p33 = pointset.define(33, enc - decalage, Li)  # Top right point Invar blade
+    p34 = pointset.define(34, enc - ei - decalage, Li)  # Top left point Invar blade
 
+    # Compatibility planes for Invar blade
+    p35 = pointset.define(35, enc - ei - 0.1, -H / 2)  # Left median plane point Invar blade
+    p36 = pointset.define(36, enc - 0.1, -H / 2)  # Right median plane point Invar blade
 
-    # Curves and wires (same as original)
+    # Median plane
+    p37 = pointset.define(37, enc - ei - 0.1, 0.0)
+    p38 = pointset.define(38, enc - 0.1, 0.0)
+
     curveset = geometry.getCurveSet()
     # blade
     c1 = curveset.add(Line(1, p1, p2))
@@ -440,13 +467,17 @@ def getMetafor(d={}):
     # rod
     c5 = curveset.add(Line(5, p5, p17))
     c6 = curveset.add(Line(6, p17, p6))
-    c7 = curveset.add(Line(7, p6, p21))
+    c71 = curveset.add(Line(71, p6, p35))
+    c72 = curveset.add(Line(72, p35, p36))
+    c73 = curveset.add(Line(73, p36, p21))
     c8 = curveset.add(Line(8, p21, p22))
     c9 = curveset.add(Line(9, p22, p7))
     c10 = curveset.add(Line(10, p7, p18))
     c11 = curveset.add(Line(11, p18, p8))
     c12 = curveset.add(Line(12, p8, p2))
-    c13 = curveset.add(Line(13, p1, p5))
+    c131 = curveset.add(Line(131, p1, p32))
+    c132 = curveset.add(Line(132, p31, p5))
+
     # mass
     c14 = curveset.add(Line(14, p9, p8))
     c15 = curveset.add(Line(15, p7, p10))
@@ -464,17 +495,29 @@ def getMetafor(d={}):
     # Ground
     c26 = curveset.add(Line(26, p25, p26))
     # Middle plane
-    c27 = curveset.add(Line(27, p17, p28))
+    c271 = curveset.add(Line(271, p17, p37))
+    c272 = curveset.add(Line(272, p38, p28))
     c28 = curveset.add(Line(28, p28, p29))
     c29 = curveset.add(Line(29, p29, p18))
+    # Median plane Invar blade
+    c34 = curveset.add(Line(34, p37, p38))
+
+    # Invar leaf spring
+    c30 = curveset.add(Line(30, p31, p32))
+    c31 = curveset.add(Line(31, p38, p33))
+    c32 = curveset.add(Line(32, p33, p34))
+    c33 = curveset.add(Line(33, p34, p37))
 
     wireset = geometry.getWireSet()
     w1 = wireset.add(Wire(1, [c28, c2, c3, c4]))
-    w2 = wireset.add(Wire(2, [c5, c27, c28, c29, c11, c12, c1, c13]))
-    w3 = wireset.add(Wire(3, [c6, c7, c8, c9, c10, c29, c28, c27]))
+    w2 = wireset.add(Wire(2, [c5, c271, c34, c272, c28, c29, c11, c12, c1, c131, c30, c132]))
+    w3 = wireset.add(Wire(3, [c6, c71, c72, c73, c8, c9, c10, c29, c28, c272, c34, c271]))
     w4 = wireset.add(Wire(4, [c14, c11, c10, c15, c16, c17, c18, c19, c20, c21]))
     w5 = wireset.add(Wire(5, [c19, c18, c22, c23, c24, c25]))
     w6 = wireset.add(Wire(6, [c26]))
+
+    # Wire for the Invar blade
+    w7 = wireset.add(Wire(7, [c34, c31, c32, c33]))
 
     sideset = geometry.getSideSet()
     s1 = sideset.add(Side(1, [w1]))
@@ -484,21 +527,30 @@ def getMetafor(d={}):
     s5 = sideset.add(Side(5, [w5]))
     s6 = sideset.add(Side(6, [w6]))
 
-    # Mesh with same parameters
+    # Side for the Invar blade
+    s7 = sideset.add(Side(7, [w7]))
+
+    # Mesh
     prog = 5
+    # Curves of the blade
     SimpleMesher1D(c1).execute(ne)
     SimpleMesher1D(c2).execute(nL)
     SimpleMesher1D(c3).execute(ne)
     SimpleMesher1D(c4).execute(nL)
+    # Curves of the rod
     SimpleMesher1D(c5).execute(n56)
     SimpleMesher1D(c6).execute(n56)
-    SimpleMesher1D(c7).execute(n7)
+    SimpleMesher1D(c71).execute(n7)
+    SimpleMesher1D(c72).execute(ne)
+    SimpleMesher1D(c73).execute(n7)
     SimpleMesher1D(c8).execute(ne)
     SimpleMesher1D(c9).execute(n9)
     SimpleMesher1D(c10).execute(n56)
     SimpleMesher1D(c11).execute(n56)
     SimpleMesher1D(c12).execute(n9)
-    SimpleMesher1D(c13).execute(n7)
+    SimpleMesher1D(c131).execute(n7)
+    SimpleMesher1D(c132).execute(n7)
+    # Curves of the mass
     SimpleMesher1D(c14).execute(n14)
     SimpleMesher1D(c15).execute(n15, 1 / prog)
     SimpleMesher1D(c16).execute(nd)
@@ -507,19 +559,30 @@ def getMetafor(d={}):
     SimpleMesher1D(c19).execute(n56)
     SimpleMesher1D(c20).execute(n14)
     SimpleMesher1D(c21).execute(nd)
+    # Curves of the end rod
     SimpleMesher1D(c22).execute(nr)
     SimpleMesher1D(c23).execute(n56)
     SimpleMesher1D(c24).execute(n56)
     SimpleMesher1D(c25).execute(nr)
-    SimpleMesher1D(c27).execute(n7)
+    # Curves of the median plane
+    SimpleMesher1D(c271).execute(n7)
+    SimpleMesher1D(c272).execute(n7)
     SimpleMesher1D(c28).execute(ne)
     SimpleMesher1D(c29).execute(n9)
+    SimpleMesher1D(c34).execute(ne)
+    # New curves for the Invar blade
+    SimpleMesher1D(c30).execute(ne)
+    SimpleMesher1D(c31).execute(nL)
+    SimpleMesher1D(c32).execute(ne)
+    SimpleMesher1D(c33).execute(nL)
 
+    # 2. Modified transfinite mesh
     TransfiniteMesher2D(s1).execute(True)
-    TransfiniteMesher2D(s2).execute2((5, (27, 28, 29), 11, (12, 1, 13)))
-    TransfiniteMesher2D(s3).execute2((6, (7, 8, 9), 10, (29, 28, 27)))
+    TransfiniteMesher2D(s2).execute2((5, (271, 34, 272, 28, 29), 11, (12, 1, 131, 30, 132)))
+    TransfiniteMesher2D(s3).execute2((6, (71, 72, 73, 8, 9), 10, (29, 28, 272, 34, 271)))
     TransfiniteMesher2D(s4).execute2(((14, 11, 10, 15), 16, (17, 18, 19, 20), 21))
     TransfiniteMesher2D(s5).execute2(((19, 18), 22, (23, 24), 25))
+    TransfiniteMesher2D(s7).execute(True)
 
     # OPTIMIZED MATERIALS - Temperature dependent Be-Cu
     materials = domain.getMaterialSet()
@@ -534,15 +597,19 @@ def getMetafor(d={}):
         yield_num = 1
     elif blade_config.material == 'INVAR':
         laws.define(2, LinearIsotropicHardening)
-        laws(2).put(IH_SIGEL, 250.0)  # Approximate elastic limit for Invar (~250 MPa): Elastic Limit: 240-725 MPa https://www.azom.com/properties.aspx?ArticleID=515
-        laws(2).put(IH_H, 600.0)  # Hardening modulus Invar (moderate value) : h = 500-800 MPa
+        laws(2).put(IH_SIGEL, 250.0)  # Approximate elastic limit for Invar (~250 MPa)
+        laws(2).put(IH_H, 800.0)  # Hardening modulus Invar (moderate value)
         yield_num = 2
     else:
         raise ValueError(f"Unsupported material: {blade_config.material}")
 
+    laws.define(2, LinearIsotropicHardening)
+    laws(2).put(IH_SIGEL, 400.0)  # Elastic limit for steel
+    laws(2).put(IH_H, 1000.0)  # Hardening modulus
+
     laws.define(3, LinearIsotropicHardening)
-    laws(3).put(IH_SIGEL, 400.0)  # Elastic limit for steel
-    laws(3).put(IH_H, 1000.0)  # Hardening modulus
+    laws(3).put(IH_SIGEL, 250.0)
+    laws(3).put(IH_H, 800.0)
 
     # Setup temperature-dependent functions
     fctE, fctCTE = setup_temperature_dependent_properties(blade_config.material)
@@ -573,6 +640,21 @@ def getMetafor(d={}):
         materials(1).put(YIELD_NUM, yield_num)
         # Note: No YIELD_NUM and TmElastHypoMaterial if elastic only: Use TmEvpIsoHHypoMaterial if plastic
 
+        #Inner blade (INVAR only)
+        materials.define(5, TmEvpIsoHHypoMaterial)
+        materials(5).put(MASS_DENSITY, 8.1e-9)
+        materials(5).put(POISSON_RATIO, 0.29)
+        materials(5).put(CONDUCTIVITY, 10.0)
+        materials(5).put(HEAT_CAPACITY, 500.e6)
+        materials(5).put(ELASTIC_MODULUS, 1.0)
+        materials(5).put(THERM_EXPANSION, 1.0)
+        materials(5).depend(ELASTIC_MODULUS, fctE_invar, Field1D(TO, RE))
+        materials(5).depend(THERM_EXPANSION, fctCTE_invar, Field1D(TO, RE))
+        materials(5).put(DISSIP_TE, 0.0)
+        materials(5).put(DISSIP_TQ, 0.0)
+        materials(5).put(YIELD_NUM, 3)
+
+
         # Structure material - Use TmElastHypoMaterial also for coherence
         # http://metafor.ltas.ulg.ac.be/dokuwiki/doc/user/elements/volumes/iso_hypo_materials
         materials.define(2, TmEvpIsoHHypoMaterial)  # Change here
@@ -584,7 +666,7 @@ def getMetafor(d={}):
         materials(2).put(HEAT_CAPACITY, 500.e6)
         materials(2).put(DISSIP_TE, 0.0)
         materials(2).put(DISSIP_TQ, 0.0)
-        materials(2).put(YIELD_NUM, 3)
+        materials(2).put(YIELD_NUM, 2)
         # Note: No YIELD_NUM and TmElastHypoMaterial if elastic only
 
     else:
@@ -601,12 +683,20 @@ def getMetafor(d={}):
 
         materials(1).put(YIELD_NUM, yield_num)
 
-        # Steel structure
+        # Inner blade (INVAR only)  # -------------------------------------------------------------Remember to change
+        materials.define(5, EvpIsoHHypoMaterial)
+        materials(5).put(MASS_DENSITY, 8.1e-9)
+        materials(5).put(POISSON_RATIO, 0.29)
+        materials(5).put(ELASTIC_MODULUS, 141e3)
+        materials(5).put(YIELD_NUM, 3)
+
+        # Structure (Steel)
         materials.define(2, EvpIsoHHypoMaterial)
         materials(2).put(MASS_DENSITY, 8.0415e-9)
         materials(2).put(ELASTIC_MODULUS, 210e3)
         materials(2).put(POISSON_RATIO, 0.3)
-        materials(2).put(YIELD_NUM, 3)
+        materials(2).put(YIELD_NUM, 2)
+
 
     # Spring material
     materials.define(4, ConstantSpringMaterial)
@@ -623,14 +713,27 @@ def getMetafor(d={}):
     if sim_config.enable_thermal:
         prp1 = ElementProperties(TmVolume2DElement)  # Blade
         prp2 = ElementProperties(TmVolume2DElement)  # Structure
+        prp5 = ElementProperties(TmVolume2DElement) #Inner blade
     else:
         prp1 = ElementProperties(Volume2DElement)
         prp2 = ElementProperties(Volume2DElement)
+        prp5 = ElementProperties(Volume2DElement)
 
     # Blade properties
     prp1.put(MATERIAL, 1)
     prp1.put(CAUCHYMECHVOLINTMETH, VES_CMVIM_SRIPR)
     prp1.put(THICKNESS, blade_config.width)
+
+    #Inside blade (Invar only)
+    prp5.put(MATERIAL, 5)
+    prp5.put(CAUCHYMECHVOLINTMETH, VES_CMVIM_SRIPR)
+    prp5.put(THICKNESS, 27) # -------------------------------------------------------------Remember to change
+
+    app5 = FieldApplicator(5)
+    app5.push(s7)
+    app5.addProperty(prp5)
+    domain.getInteractionSet().add(app5)
+
 
     # Structure properties
     prp2.put(MATERIAL, 2)
@@ -638,6 +741,7 @@ def getMetafor(d={}):
     prp2.put(THICKNESS, 63.0)
     prp2.put(GRAVITY_Y, -9.81e3)
     prp2.depend(GRAVITY_Y, fctG, Field1D(TM))
+
 
 
     # Apply properties
@@ -672,40 +776,59 @@ def getMetafor(d={}):
     app4.addProperty(prp4)
     domain.getInteractionSet().add(app4)
 
-    # Boundary conditions
-    domain.getLoadingSet().define(p17, Field1D(TX, RE), 0.0)
-    domain.getLoadingSet().define(p17, Field1D(TY, RE), 0.0)
-    domain.getLoadingSet().define(c26, Field1D(TX, RE), 0.0)
-    domain.getLoadingSet().define(c26, Field1D(TY, RE), 0.0)
-    domain.getLoadingSet().define(p30, Field1D(TY, RE), 0.0)
-    domain.getLoadingSet().define(p30, Field1D(TX, RE), 0.0)
+    # Prescribed displacements
+    # bottom: clamped
+    domain.getLoadingSet().define(p17, Field1D(TX,RE), 0.0) # hinge clamped
+    domain.getLoadingSet().define(p17, Field1D(TY,RE), 0.0) # hinge clamped
+    domain.getLoadingSet().define(c26, Field1D(TX,RE), 0.0) # ground first fixed
+    domain.getLoadingSet().define(c26, Field1D(TY,RE), 0.0) # ground first fixed
+    domain.getLoadingSet().define(p30, Field1D(TY,RE), 0.0) # hinge spring end fixed
+    domain.getLoadingSet().define(p30, Field1D(TX,RE), 0.0) # hinge spring end fixed
 
-    # Rotation setup
+    # Rotation axis for the Be-Cu blade
     pa1 = pointset.define(23, enc + e / 2, L / 2)
     pa2 = pointset.define(24, enc + e / 2, L / 2, 1.0)
-    axe1 = Axe(pa1, pa1)
-    axe1.setSymZ1(1.0)
+    axe1_BeCu = Axe(pa1, pa2)
+    axe1_BeCu.setSymZ1(1.0)
 
-    pa3 = pointset.define(31, Dx + Dx1 + enc + e / 2, Dy, 0.0)
-    pa4 = pointset.define(32, Dx + Dx1 + enc + e / 2, Dy, 1.0)
+    # Rotation axis for the Invar blade
+    pa5 = pointset.define(41, enc - ei / 2 - decalage, Li / 2)
+    pa6 = pointset.define(42, enc - ei / 2 - decalage, Li / 2, 1.0)
+    axe1_Invar = Axe(pa5, pa6)
+    axe1_Invar.setSymZ1(1.0)
+
+    # For Be-Cu blade
+    pa3 = pointset.define(39, Dx + Dx1 + enc + e / 2, Dy, 0.0)
+    pa4 = pointset.define(40, Dx + Dx1 + enc + e / 2, Dy, 1.0)
     axe2 = Axe(pa3, pa4)
 
-    # OPTIMIZED LOADING FUNCTIONS - Smoother and faster convergence
+    # For Invar blade - ensure consistent spacing
+    pa3i = pointset.define(43, Dx + Dx1 + enc - ei / 2 - decalage, Dy, 0.0)  # Adjusted x-coordinate
+    pa4i = pointset.define(44, Dx + Dx1 + enc - ei / 2 - decalage, Dy, 1.0)
+    axe2_Invar = Axe(pa3i, pa4i)
+
+    # axis displacement
     fctX = PieceWiseLinearFunction()
-    fctX.setData(0.0, 0.0) # Start → 0 move
-    fctX.setData(T_load / 8, 0.0) # t = 1.25s -> always 0
-    fctX.setData(T_load / 2, Dx / (Dx + Dx1)) # t = 5s -> partial displacement (~1 if Dx1=0)
-    fctX.setData(3 * T_load / 4, 1.0) # t = 7.5s -> full displacement
+    fctX.setData(0.0, 0.0)
+    fctX.setData(T_load / 8, 0.0)
+    fctX.setData(T_load / 2, Dx / (Dx + Dx1))
+    fctX.setData(3 * T_load / 4, 1.0)
     fctX.setData(T_load, 1.0)
-    fctX.setData(12.0, 1.0)
     fctX.setData(T, 1.0)
+
+    fctX_invar = PieceWiseLinearFunction()
+    fctX_invar.setData(0.0, 0.0)
+    fctX_invar.setData(T_load / 8, 0.0)
+    fctX_invar.setData(T_load / 2, Dx_invar / (Dx + Dx1))  # <-- new value
+    fctX_invar.setData(3 * T_load / 4, 1.0)
+    fctX_invar.setData(T_load, 1.0)
+    fctX_invar.setData(T, 1.0)
 
     fctY = PieceWiseLinearFunction()
     fctY.setData(0.0, 0.0)
     fctY.setData(T_load / 2, 0.0)
     fctY.setData(3 * T_load / 4, 1.0)
     fctY.setData(T_load, 1.0)
-    fctY.setData(12.0, 1.0)
     fctY.setData(T, 1.0)
 
     domain.getLoadingSet().define(pa1, Field1D(TX, RE), (Dx + Dx1), fctX)
@@ -713,25 +836,62 @@ def getMetafor(d={}):
     domain.getLoadingSet().define(pa1, Field1D(TY, RE), Dy, fctY)
     domain.getLoadingSet().define(pa2, Field1D(TY, RE), Dy, fctY)
 
-    # OPTIMIZED ROTATION FUNCTIONS - Much smoother for better convergence
+    # domain.getLoadingSet().define(pa5, Field1D(TX, RE), (Dx + Dx1), fctX)
+    # domain.getLoadingSet().define(pa6, Field1D(TX, RE), (Dx + Dx1), fctX)
+    domain.getLoadingSet().define(pa5, Field1D(TX, RE), Dx_invar, fctX_invar)
+    domain.getLoadingSet().define(pa6, Field1D(TX, RE), Dx_invar, fctX_invar)
+    domain.getLoadingSet().define(pa3i, Field1D(TX, RE), Dx_invar, fctX_invar)
+    domain.getLoadingSet().define(pa4i, Field1D(TX, RE), Dx_invar, fctX_invar)
+    domain.getLoadingSet().define(pa5, Field1D(TY, RE), Dy, fctY)
+    domain.getLoadingSet().define(pa6, Field1D(TY, RE), Dy, fctY)
+    domain.getLoadingSet().define(pa3i, Field1D(TY, RE), Dy, fctY)
+    domain.getLoadingSet().define(pa4i, Field1D(TY, RE), Dy, fctY)
+
+    # rotation functions
     fctR = PieceWiseLinearFunction()
     fctR.setData(0.0, 0.0)
     fctR.setData(T_load / 10, 0.0)
     fctR.setData(T_load / 2, 1.0)
     fctR.setData(3 * T_load / 4, 1.0)
     fctR.setData(T_load, 1.0)
-    fctR.setData(12.0, 1.0)
     fctR.setData(T, 1.0)
+
     fctR2 = PieceWiseLinearFunction()
     fctR2.setData(0.0, 0.0)
     fctR2.setData(T_load / 10, 0.0)
     fctR2.setData(T_load / 2, 0.0)
     fctR2.setData(3 * T_load / 4, 0.0)
     fctR2.setData(T_load, 1.0)
-    fctR2.setData(12.0, 1.0)
     fctR2.setData(T, 1.0)
 
-    domain.getLoadingSet().defineRot2(c3, Field3D(TXTYTZ, RE), axe2, angleClamp, fctR2, axe1, 180, fctR, False)
+    # Rotation functions for Invar (same timing, but frozen axis movement)
+
+    # Rotation (same as fctR)
+    fctR_invar = PieceWiseLinearFunction()
+    fctR_invar.setData(0.0, 0.0)
+    fctR_invar.setData(T_load / 10, 0.0)
+    fctR_invar.setData(T_load / 2, 1.0)
+    fctR_invar.setData(3 * T_load / 4, 1.0)
+    fctR_invar.setData(T_load, 1.0)
+    fctR_invar.setData(T, 1.0)
+
+    # Displacement of the Invar rotation axis (fixed at 0.0)
+    fctR2_invar = PieceWiseLinearFunction()
+    fctR2_invar.setData(0.0, 0.0)
+    fctR2_invar.setData(T_load / 10, 0.0)
+    fctR2_invar.setData(T_load / 2, 0.0)
+    fctR2_invar.setData(3 * T_load / 4, 0.0)
+    fctR2_invar.setData(T_load, 1.0)  # 0.0 before
+    fctR2_invar.setData(T, 1.0)  # 0.0 before
+
+    # Apply rotation to Be-Cu blade
+    domain.getLoadingSet().defineRot2(c3, Field3D(TXTYTZ, RE), axe2, angleClamp, fctR2, axe1_BeCu, 180, fctR, False)
+
+    # Rotation applied to the Invar blade
+    domain.getLoadingSet().defineRot2(
+        c32, Field3D(TXTYTZ, RE),
+        axe2_Invar, angleClamp, fctR2_invar,
+        axe1_Invar, 180, fctR_invar, False)
 
     # OPTIMIZED THERMAL LOADING
     if sim_config.enable_thermal:
@@ -745,12 +905,11 @@ def getMetafor(d={}):
 
         initcondset = metafor.getDomain().getInitialConditionSet()
         # Set initial conditions for all sides
-        for side_num in [1, 2, 3, 4, 5]:
+        for side_num in [1, 2, 3, 4, 5, 7]:
             side = sideset(side_num)
             initcondset.define(side, Field1D(TO, AB), Tabs)  # Absolute reference
             initcondset.define(side, Field1D(TO, RE), 0.0)  # Start at 0 relative to reference
 
-            # CORRECTED thermal loading function
         fctT = PieceWiseLinearFunction()
         fctT.setData(0.0, 0.0)  # Start at reference (20C)
         fctT.setData(sim_config.loading_time, 0.0)  # No thermal change during mechanical loading
@@ -761,7 +920,7 @@ def getMetafor(d={}):
         fctT.setData(sim_config.final_time, temp_delta)  # Maintain final state
 
         # Apply thermal loading
-        for side_num in [1, 2, 3, 4, 5]:
+        for side_num in [1, 2, 3, 4, 5, 7]:
             side = sideset(side_num)
             domain.getLoadingSet().define(side, Field1D(TO, RE), 1.0, fctT)
 

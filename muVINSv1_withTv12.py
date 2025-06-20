@@ -1,6 +1,4 @@
 # AUTOMATED SEQUENTIAL SIMULATION SYSTEM
-#muVINSv1_withTv11 but multiple one after another : Goal is to make the programm turn multiple configuration by itself during a night or spare time.
-#Can't manage to make it work: abandoned project for now
 
 import os
 import shutil

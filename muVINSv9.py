@@ -41,7 +41,7 @@ def getMetafor(d={}):
     # Parameters
 
     # blade
-    e = 0.24    # thickness
+    e = 0.27    # thickness
     L = 105.25  # length
 
     # rod
@@ -53,7 +53,7 @@ def getMetafor(d={}):
     enc =  57.32    # Leaf-spring clamping point location on the rod (hinge = origin pt)
 
     # Invar blade
-    ei = 0.07  # invar thickness
+    ei = 0.25  # invar thickness
     # Relative position of the blades (horizontal offset of 0.1mm)
     decalage = 0.1  # offset between the blades
     rayon_interne_BeCu = enc / 2
@@ -341,13 +341,13 @@ def getMetafor(d={}):
     prp1 = ElementProperties(Volume2DElement)
     prp1.put(MATERIAL, 1)
     prp1.put(CAUCHYMECHVOLINTMETH, VES_CMVIM_SRIPR)
-    prp1.put(THICKNESS, 45.0)   # Set blade width
+    prp1.put(THICKNESS, 20.5)   # Set blade width
 
     # Properties for the Invar blade
     prp5 = ElementProperties(Volume2DElement)
     prp5.put(MATERIAL, 5)
     prp5.put(CAUCHYMECHVOLINTMETH, VES_CMVIM_SRIPR)
-    prp5.put(THICKNESS, 20.0)   # Decrease thickness to reduce stiffness
+    prp5.put(THICKNESS, 27.0)   # Decrease thickness to reduce stiffness
 
     fctG = PieceWiseLinearFunction()
     fctG.setData(0.0, 1.0)
