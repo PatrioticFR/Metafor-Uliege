@@ -493,7 +493,7 @@ def getMetafor(d={}):
         fctT.setData(0.0, sim_config.temp_initial_kelvin)  # 293.15K (20°C)
         fctT.setData(sim_config.loading_time, sim_config.temp_initial_kelvin)  # Maintain during mechanical loading
         fctT.setData(sim_config.temp_start_time, sim_config.temp_initial_kelvin)  # Start thermal change
-        fctT.setData(sim_config.temp_end_time, sim_config.temp_final_kelvin)  # End thermal change (20K = -253°C)
+        fctT.setData(sim_config.temp_end_time, sim_config.temp_final_kelvin)  # End thermal change (50C)
         fctT.setData(sim_config.final_time, sim_config.temp_final_kelvin)  # Maintain final temperature
 
         # Apply thermal loading to all relevant sides

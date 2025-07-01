@@ -25,9 +25,9 @@ class BladeConfig:
 
     def __init__(self):
         # Blade geometry
-        self.thickness = 0.28  # blade thickness (e)
-        self.length = 94.80  # blade length (L)
-        self.width = 19.1  # blade width (thickness in 3D)
+        self.thickness = 0.24  # blade thickness (e)
+        self.length = 105.25  # blade length (L)
+        self.width = 45.0  # blade width (thickness in 3D)
 
         # Material selection: 'BE_CU', 'INVAR', 'STEEL'
         self.material = 'BE_CU'

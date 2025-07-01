@@ -140,37 +140,63 @@ class BladeConfig:
 
         return warnings
 
+    from math import pi, sqrt
+
     def estimate_resonance_frequency(self):
         """
-        Estimate first resonance frequency based on TFE Equation (4.14) and (4.4)
-        f = (1/2π) * sqrt((kth * r_s² + kflex) / I)
-        where kth = (π² / 24) * E * w * h³ / L³
+        Estimate the first resonance frequency using the corrected TFE formulation:
+        f_th = (1 / 2π) * sqrt((kth * r_s^2 + kflex) / I)
+
+        Includes dynamic inertia computation from the geometry using the method of bars.
         """
-        # Material properties
+        # Select material Young modulus (in MPa)
         if self.material == 'BE_CU':
-            E = 131e3  # MPa = N/mm²
+            E = 131e3
         elif self.material == 'INVAR':
             E = 141e3
         else:  # STEEL
             E = 210e3
 
-        # Geometric parameters
-        h = self.thickness
-        w = self.width
-        L = self.length
+        # Geometry
+        h_blade = self.thickness  # mm (blade thickness)
+        w = self.width  # mm (blade width)
+        L = self.length  # mm (blade length)
 
-        # Correct kth using Equation (4.4) from TFE
-        kth = (pi ** 2 / 24) * E * w * h ** 3 / L ** 3  # N⋅mm
+        # Fixed geometric data for rod/mass system (assumed constants from structure)
+        H = 3.875  # rod vertical thickness (mm)
+        D = 39.99  # mass block height (mm)
+        d = 13.96  # mass block length (mm)
+        l = 79.2  # total rod length (mm)
+        r = 7.0  # rod right segment (mm)
+        R = H  # rod right width
+        rho = 7.85e-6  # steel density (kg/mm³)
+        depth = 63.0  # structure width/depth (mm)
 
-        # Torsional stiffness of flexure (from TFE)
-        k_flex = 44.3  # N⋅mm
+        # Recompute h (rod left segment)
+        h = l - r - d
 
-        # System inertia and lever arm (from TFE/MATLAB)
-        I_system = 1453.5  # kg⋅mm²
+        # Method of bars to compute I (kg·mm²)
+        # Rod gauche
+        I_barre_rod_g = rho * depth * h * (H ** 3 / 3 + H * (h / 2) ** 2)
+        # Bloc masse
+        I_barre_mass = rho * depth * d * (D ** 3 / 3 + D * (h + d / 2) ** 2)
+        # Rod droit
+        I_barre_rod_d = rho * depth * r * (R ** 3 / 3 + R * (h + d + r / 2) ** 2)
+
+        # Total inertia
+        I_system = I_barre_rod_g + I_barre_mass + I_barre_rod_d  # kg·mm²
+
+        # Compute kth [N·mm] using corrected formula (π² / 6)
+        kth = (pi ** 2 / 6) * E * w * h_blade ** 3 / L ** 3  # N·mm
+        kth_mNm = kth * 1e3  # convert to mN·m
+
+        # Fixed flexure stiffness and lever arm
+        k_flex = 44.3  # mN·m
         r_s = 65.22  # mm
 
-        # Compute frequency using TFE Equation (4.14)
-        f_est = (1 / (2 * pi)) * sqrt((kth * r_s ** 2 + k_flex) / I_system)
+        # Frequency estimation [Hz]
+        numerator = kth_mNm * r_s ** 2 + k_flex
+        f_est = (1 / (2 * pi)) * sqrt(numerator / I_system)
 
         return f_est
 

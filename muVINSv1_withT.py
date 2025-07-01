@@ -243,6 +243,14 @@ def getMetafor(d={}):
     materials.define(4,ConstantSpringMaterial)
     materials(4).put(SPRING_FK,  11.7211)   # Hinge rotational stiffness in N/mm (4*k_rot/H^2)
 
+    # Invar (Fe-Ni 36%) - Very low thermal expansion coefficient
+    #https://www.azom.com/properties.aspx?ArticleID=515
+    materials.define (5, EvpIsoHHypoMaterial)
+    materials(5).put(MASS_DENSITY,     8.1e-9)      # kg/mm³ (min: 8.05 – max: 8.15)
+    materials(5).put(ELASTIC_MODULUS, 143e3)        # MPa (min: 140 – max: 148)
+    materials(5).put(POISSON_RATIO,    0.26)  #(min: 0.23 – max: 0.294)
+    materials(5).put(YIELD_NUM,           3)
+
     laws = domain.getMaterialLawSet()
     laws.define (1, LinearIsotropicHardening)
     laws(1).put(IH_SIGEL, 1000.0)
@@ -252,11 +260,21 @@ def getMetafor(d={}):
     laws(2).put(IH_SIGEL, 400.0)
     laws(2).put(IH_H,    1000.0)
 
+    # Behavior law for Invar
+    laws.define (3, LinearIsotropicHardening)
+    laws(3).put(IH_SIGEL, 276.0)    # Yield limit Invar (min: 240 – max: 380)
+    laws(3).put(IH_H,    800.0) # (min: 500 – max: 1500)
+
     prp1 = ElementProperties(Volume2DElement)
     prp1.put(MATERIAL, 1)
     prp1.put(CAUCHYMECHVOLINTMETH, VES_CMVIM_SRIPR)
     prp1.put(THICKNESS, 45.0)   # Set blade width
 
+    # Properties for the Invar blade
+    prp5 = ElementProperties(Volume2DElement)
+    prp5.put(MATERIAL, 5)
+    prp5.put(CAUCHYMECHVOLINTMETH, VES_CMVIM_SRIPR)
+    prp5.put(THICKNESS, 20.0)   # Decrease thickness to reduce stiffness
 
     fctG = PieceWiseLinearFunction()
     fctG.setData(0.0, 1.0)
@@ -274,6 +292,12 @@ def getMetafor(d={}):
     app.push(s1)
     app.addProperty(prp1)
     domain.getInteractionSet().add(app)
+
+    # --------------------Application of properties to the Invar blade------------------
+    #app5 = FieldApplicator(5)
+    #app5.push(s1)
+    #app5.addProperty(prp5)
+    #domain.getInteractionSet().add(app5)
 
     app2 = FieldApplicator(2)
     app2.push(s2)
@@ -375,13 +399,20 @@ def getMetafor(d={}):
     ])
 
     # Matériau avec dilatation thermique (Be-Cu)
-    mat_be_cu = MaterialManager.getInstance().get(1)  # vérifier ID
+    mat_be_cu = MaterialManager.getInstance().get(1)
     mat_be_cu.setThermalExpansion(17e-6)  # en 1/°C
     mat_be_cu.setReferenceTemperature(10.0)
     loadset = metafor.getLoadStepManager().getLoadStep(1)
     loadset.defineTemperature(sideset(1), fct_Temp)
 
-    # Ground displacement
+    # Matériau avec dilatation thermique (Invar)
+    #mat_be_cu = MaterialManager.getInstance().get(1)
+    #mat_be_cu.setThermalExpansion(1.2e-6)  # en 1/°C (min= 0.5, max=2)
+    #mat_be_cu.setReferenceTemperature(10.0)
+    #loadset = metafor.getLoadStepManager().getLoadStep(1)
+    #loadset.defineTemperature(sideset(1), fct_Temp)
+
+    # ----------------------------------------Ground displacement------------------------------------------------
     # When the mass is at equilibrium, the ground is removed to avoid perturbing
     # the free oscillations of the sensor.
     fctSol = PieceWiseLinearFunction()
@@ -452,9 +483,9 @@ def getMetafor(d={}):
         ext = IFNodalValueExtractor(interactionset(1), IF_EVMS)
         hcurves.add(9, ext, MaxOperator(), 'Max VonMises')
 
-        # 👉 Ajout des déplacements verticaux de P10 et P11
-        hcurves.add(10, DbNodalValueExtractor(P10, Field1D(TY, RE)), SumOperator(), 'dispY_P10')
-        hcurves.add(11, DbNodalValueExtractor(P11, Field1D(TY, RE)), SumOperator(), 'dispY_P11')
+        # 👉 Ajout des déplacements verticaux de p10 et p11 (correction: minuscules)
+        hcurves.add(10, DbNodalValueExtractor(p10, Field1D(TY, RE)), SumOperator(), 'dispY_P10')
+        hcurves.add(11, DbNodalValueExtractor(p11, Field1D(TY, RE)), SumOperator(), 'dispY_P11')
 
         for i in range(1, 12):  # Ajusté jusqu'à 11 inclus
             metafor.getTestSuiteChecker().checkExtractor(i)

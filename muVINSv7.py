@@ -1,7 +1,7 @@
-# TFE: Towrads the development of an ultra-high performance inertial sensor for
+# TFE: Towards the development of an ultra-high performance inertial sensor for
 # gravitational waves detection
 
-# Study of the muVINS and the influence of the leaf-spring spring suspension
+# Study of the muVINS and the influence of the leaf-spring suspension
 # length and clamping point location and orientation on the equilibrium position
 # and the resonance frequency.
 
@@ -11,7 +11,6 @@
 # -*- coding: utf-8 -*-
 
 #0.07
-
 
 from wrap import *
 from wrap.mtFrequencyAnalysisw import *
@@ -23,7 +22,6 @@ from toolbox.utilities import *
 StrVectorBase.useTBB()
 StrMatrixBase.useTBB()
 ContactInteraction.useTBB()
-
 
 def getMetafor(d={}):
 
@@ -45,19 +43,19 @@ def getMetafor(d={}):
     l = 79.2    # total length
     H = 3.875   # thickness
 
-    r = 7       # distance betwee mass and rod end
+    r = 7       # distance between mass and rod end
     R = H
     enc =  57.32    # Leaf-spring clamping point location on the rod (hinge = origin pt)
 
     # Invar blade
     ei = 0.07  # invar thickness
-    # Position relative des lames (décalage horizontal de 0.1mm)
-    decalage = 0.1  # décalage entre les lames
+    # Relative position of the blades (horizontal offset of 0.1mm)
+    decalage = 0.1  # offset between the blades
     rayon_interne_BeCu = enc / 2
-    R_beCu = rayon_interne_BeCu + e / 2  # Rayon médian de la lame Be-Cu
-    R_invar = rayon_interne_BeCu - decalage - ei / 2  # Rayon médian de la lame Invar
+    R_beCu = rayon_interne_BeCu + e / 2  # Median radius of the Be-Cu blade
+    R_invar = rayon_interne_BeCu - decalage - ei / 2  # Median radius of the Invar blade
     ratio = R_invar / R_beCu
-    Li = L * ratio # La longueur doit être proportionnelle au rayon pour un même angle de pliage
+    Li = L * ratio # The length must be proportional to the radius for the same bending angle
 
     # mass
     D = 39.99   # height
@@ -85,8 +83,7 @@ def getMetafor(d={}):
     Dy = 0.0        # set vertical shift (>0: shift upward)
     angleClamp = 0.0    # set angle (>0: anti-clockwise)
 
-
-    #Dx_invar = Dx * ratio  # <--- plus petit que Dx
+    #Dx_invar = Dx * ratio  # <--- smaller than Dx
     Dx_invar = Dx * ratio  # Adjusted to keep the blades separate when folded
 
     # Geometry
@@ -136,20 +133,19 @@ def getMetafor(d={}):
     # Spring
     p30 = pointset.define(30, 0.0, -H/2)
 
-    # Nouvelle lame ressort en Invar (côte à côte avec la lame Be-Cu)
-    p31 = pointset.define(31, enc - ei - decalage, H / 2)      # Point bas gauche lame Invar
-    p32 = pointset.define(32, enc - decalage, H / 2)  # Point bas droit lame Invar
-    p33 = pointset.define(33, enc - decalage, Li)  # Point haut droit lame Invar
-    p34 = pointset.define(34, enc - ei - decalage, Li)  # Point haut gauche lame Invar
+    # New Invar leaf spring (side by side with the Be-Cu blade)
+    p31 = pointset.define(31, enc - ei - decalage, H / 2)      # Bottom left point Invar blade
+    p32 = pointset.define(32, enc - decalage, H / 2)  # Bottom right point Invar blade
+    p33 = pointset.define(33, enc - decalage, Li)  # Top right point Invar blade
+    p34 = pointset.define(34, enc - ei - decalage, Li)  # Top left point Invar blade
 
-    # Plans de compatibilité pour lame Invar
-    p35 = pointset.define(35, enc - ei - 0.1, -H / 2)  # Point plan médian gauche lame Invar
-    p36 = pointset.define(36, enc - 0.1, -H / 2)  # Point plan médian droit lame Invar
+    # Compatibility planes for Invar blade
+    p35 = pointset.define(35, enc - ei - 0.1, -H / 2)  # Left median plane point Invar blade
+    p36 = pointset.define(36, enc - 0.1, -H / 2)  # Right median plane point Invar blade
 
-    # Plan médian
+    # Median plane
     p37 = pointset.define(37, enc - ei - 0.1, 0.0)
     p38 = pointset.define(38, enc - 0.1, 0.0)
-
 
     curveset = geometry.getCurveSet()
     # blade
@@ -192,15 +188,14 @@ def getMetafor(d={}):
     c272 = curveset.add(Line(272, p38, p28))
     c28 = curveset.add(Line(28, p28, p29))
     c29 = curveset.add(Line(29, p29, p18))
-    # Plan médian lame Invar
+    # Median plane Invar blade
     c34 = curveset.add(Line(34, p37, p38))
 
-    # Lame ressort Invar
+    # Invar leaf spring
     c30 = curveset.add(Line(30, p31, p32))
     c31 = curveset.add(Line(31, p38, p33))
     c32 = curveset.add(Line(32, p33, p34))
     c33 = curveset.add(Line(33, p34, p37))
-
 
     wireset = geometry.getWireSet()
     w1 = wireset.add( Wire(1, [c28, c2, c3, c4]) )
@@ -210,7 +205,7 @@ def getMetafor(d={}):
     w5 = wireset.add( Wire(5, [c19, c18, c22, c23, c24, c25]) )
     w6 = wireset.add( Wire(6, [c26]) )
 
-    # Wire pour la lame Invar
+    # Wire for the Invar blade
     w7 = wireset.add( Wire(7, [c34, c31, c32, c33]) )
 
     sideset = geometry.getSideSet()
@@ -221,7 +216,7 @@ def getMetafor(d={}):
     s5 = sideset.add(Side(5, [w5]))
     s6 = sideset.add(Side(6, [w6]))
 
-    # Side pour la lame Invar
+    # Side for the Invar blade
     s7 = sideset.add(Side(7, [w7]))
 
     if 0:
@@ -233,14 +228,14 @@ def getMetafor(d={}):
 
     # Mesh
     prog = 5
-    # Courbes de la lame
+    # Curves of the blade
     SimpleMesher1D(c1).execute(ne)
     SimpleMesher1D(c2).execute(nL)
     SimpleMesher1D(c3).execute(ne)
     SimpleMesher1D(c4).execute(nL)
-    # Courbes de la tige
+    # Curves of the rod
     SimpleMesher1D(c5).execute(n56)
-    #SimpleMesher1D(c5).execute(14)  # Ajusté à 15 nœuds exactement pour Edge #1
+    #SimpleMesher1D(c5).execute(14)  # Adjusted to 15 nodes exactly for Edge #1
     SimpleMesher1D(c6).execute(n56)
     SimpleMesher1D(c71).execute(n7)
     SimpleMesher1D(c72).execute(ne)
@@ -249,11 +244,11 @@ def getMetafor(d={}):
     SimpleMesher1D(c9).execute(n9)
     SimpleMesher1D(c10).execute(n56)
     SimpleMesher1D(c11).execute(n56)
-    #SimpleMesher1D(c11).execute(19)  # Ajusté à 20 nœuds exactement pour Edge #3
+    #SimpleMesher1D(c11).execute(19)  # Adjusted to 20 nodes exactly for Edge #3
     SimpleMesher1D(c12).execute(n9)
     SimpleMesher1D(c131).execute(n7)
     SimpleMesher1D(c132).execute(n7)
-    # Courbes de la masse
+    # Curves of the mass
     SimpleMesher1D(c14).execute(n14)
     SimpleMesher1D(c15).execute(n15, 1 / prog)
     SimpleMesher1D(c16).execute(nd)
@@ -262,24 +257,24 @@ def getMetafor(d={}):
     SimpleMesher1D(c19).execute(n56)
     SimpleMesher1D(c20).execute(n14)
     SimpleMesher1D(c21).execute(nd)
-    # Courbes de la tige de fin
+    # Curves of the end rod
     SimpleMesher1D(c22).execute(nr)
     SimpleMesher1D(c23).execute(n56)
     SimpleMesher1D(c24).execute(n56)
     SimpleMesher1D(c25).execute(nr)
-    # Courbes du plan médian
+    # Curves of the median plane
     SimpleMesher1D(c271).execute(n7)
     SimpleMesher1D(c272).execute(n7)
     SimpleMesher1D(c28).execute(ne)
     SimpleMesher1D(c29).execute(n9)
     SimpleMesher1D(c34).execute(ne)
-    # Courbes nouvelles pour la lame Invar
+    # New curves for the Invar blade
     SimpleMesher1D(c30).execute(ne)
     SimpleMesher1D(c31).execute(nL)
     SimpleMesher1D(c32).execute(ne)
     SimpleMesher1D(c33).execute(nL)
 
-    # 2. Maillage transfini modifié
+    # 2. Modified transfinite mesh
     TransfiniteMesher2D(s1).execute(True)
     TransfiniteMesher2D(s2).execute2((5, (271,34,272, 28, 29), 11, (12, 1, 131, 30, 132)))
     TransfiniteMesher2D(s3).execute2((6, (71, 72, 73, 8, 9), 10, (29, 28, 272,34,271)))
@@ -316,12 +311,12 @@ def getMetafor(d={}):
     materials.define(4,ConstantSpringMaterial)
     materials(4).put(SPRING_FK,  11.7211)   # Hinge rotational stiffness in N/mm (4*k_rot/H^2)
 
-    # Invar (Fe-Ni 36%) - Coefficient de dilatation thermique très faible
+    # Invar (Fe-Ni 36%) - Very low thermal expansion coefficient
     #https://www.azom.com/properties.aspx?ArticleID=515
     materials.define (5, EvpIsoHHypoMaterial)
-    materials(5).put(MASS_DENSITY,     8.1e-9)      # kg/mm³ (min : 8,05 – max : 8,15)
-    materials(5).put(ELASTIC_MODULUS, 143e3)        # MPa (min : 140 – max : 148)
-    materials(5).put(POISSON_RATIO,    0.26)  #(min : 0,23 – max : 0,294)
+    materials(5).put(MASS_DENSITY,     8.1e-9)      # kg/mm³ (min: 8.05 – max: 8.15)
+    materials(5).put(ELASTIC_MODULUS, 143e3)        # MPa (min: 140 – max: 148)
+    materials(5).put(POISSON_RATIO,    0.26)  #(min: 0.23 – max: 0.294)
     materials(5).put(YIELD_NUM,           3)
 
     laws = domain.getMaterialLawSet()
@@ -333,21 +328,21 @@ def getMetafor(d={}):
     laws(2).put(IH_SIGEL, 400.0)
     laws(2).put(IH_H,    1000.0)
 
-    # Loi de comportement pour Invar
+    # Behavior law for Invar
     laws.define (3, LinearIsotropicHardening)
-    laws(3).put(IH_SIGEL, 276.0)    # Limite elastique Invar (min : 240 – max : 380)
-    laws(3).put(IH_H,    800.0) # (min : 500 – max : 1500)
+    laws(3).put(IH_SIGEL, 276.0)    # Yield limit Invar (min: 240 – max: 380)
+    laws(3).put(IH_H,    800.0) # (min: 500 – max: 1500)
 
     prp1 = ElementProperties(Volume2DElement)
     prp1.put(MATERIAL, 1)
     prp1.put(CAUCHYMECHVOLINTMETH, VES_CMVIM_SRIPR)
     prp1.put(THICKNESS, 45.0)   # Set blade width
 
-    # Propriétés pour la lame Invar
+    # Properties for the Invar blade
     prp5 = ElementProperties(Volume2DElement)
     prp5.put(MATERIAL, 5)
     prp5.put(CAUCHYMECHVOLINTMETH, VES_CMVIM_SRIPR)
-    prp5.put(THICKNESS, 20.0)   # Diminuer l'épaisseur pour diminuer la rigidité
+    prp5.put(THICKNESS, 20.0)   # Decrease thickness to reduce stiffness
 
     fctG = PieceWiseLinearFunction()
     fctG.setData(0.0, 1.0)
@@ -366,7 +361,7 @@ def getMetafor(d={}):
     app.addProperty(prp1)
     domain.getInteractionSet().add(app)
 
-    # Application des propriétés à la lame Invar
+    # Application of properties to the Invar blade
     app5 = FieldApplicator(5)
     app5.push(s7)
     app5.addProperty(prp5)
@@ -380,11 +375,11 @@ def getMetafor(d={}):
     app2.addProperty(prp2)
     domain.getInteractionSet().add(app2)
 
-    # GROUPES D'ATTRIBUTS
+    # ATTRIBUTE GROUPS
     groupset = geometry.getGroupSet()
     groupset.add(Group(1)); groupset(1).addMeshPoint(p6)
     groupset.add(Group(2)); groupset(2).addMeshPoint(p30)
-    # Generation du "maillage" ressort
+    # Generation of the "spring mesh"
     springMesher = CellLineMesher(groupset(1),groupset(2))
     springMesher.execute()
     # Spring inducing the stiffness of the hinge
@@ -440,7 +435,7 @@ def getMetafor(d={}):
     fctX_invar = PieceWiseLinearFunction()
     fctX_invar.setData(0.0, 0.0)
     fctX_invar.setData(T_load / 8, 0.0)
-    fctX_invar.setData(T_load / 2, Dx_invar / (Dx + Dx1))  # <-- nouvelle valeur
+    fctX_invar.setData(T_load / 2, Dx_invar / (Dx + Dx1))  # <-- new value
     fctX_invar.setData(3 * T_load / 4, 1.0)
     fctX_invar.setData(T_load, 1.0)
     fctX_invar.setData(T, 1.0)
@@ -487,7 +482,7 @@ def getMetafor(d={}):
 
     # Rotation functions for Invar (same timing, but frozen axis movement)
 
-    # Rotation (même que fctR)
+    # Rotation (same as fctR)
     fctR_invar = PieceWiseLinearFunction()
     fctR_invar.setData(0.0, 0.0)
     fctR_invar.setData(T_load / 10, 0.0)
@@ -496,19 +491,19 @@ def getMetafor(d={}):
     fctR_invar.setData(T_load, 1.0)
     fctR_invar.setData(T, 1.0)
 
-    # Déplacement de l'axe de rotation Invar (figé à 0.0)
+    # Displacement of the Invar rotation axis (fixed at 0.0)
     fctR2_invar = PieceWiseLinearFunction()
     fctR2_invar.setData(0.0, 0.0)
     fctR2_invar.setData(T_load / 10, 0.0)
     fctR2_invar.setData(T_load / 2, 0.0)
     fctR2_invar.setData(3 * T_load / 4, 0.0)
-    fctR2_invar.setData(T_load, 1.0) #0.0 avant
-    fctR2_invar.setData(T, 1.0) #0.0 avant
+    fctR2_invar.setData(T_load, 1.0) #0.0 before
+    fctR2_invar.setData(T, 1.0) #0.0 before
 
     # Apply rotation to Be-Cu blade
     domain.getLoadingSet().defineRot2(c3, Field3D(TXTYTZ, RE), axe2, angleClamp, fctR2, axe1_BeCu, 180, fctR, False)
 
-    # Rotation appliquée à la lame Invar
+    # Rotation applied to the Invar blade
     domain.getLoadingSet().defineRot2(
         c32, Field3D(TXTYTZ, RE),
         axe2_Invar, angleClamp, fctR2_invar,
@@ -541,7 +536,6 @@ def getMetafor(d={}):
     ci.addProperty(prp3)
     domain.getInteractionSet().add(ci)
 
-
     # Time integration scheme
     ti = AlphaGeneralizedTimeIntegration(metafor)
     metafor.setTimeIntegration(ti)
@@ -552,7 +546,7 @@ def getMetafor(d={}):
     tsm.setNextTime(  T, 1, 0.1)
     # To reduce the simulation time, a longer dt can be used but it affects the
     # accuracy of the free oscillations and thus the final equilibrium configuration
-    # of the sensor, expecially when close to unstability. This dt must be used
+    # of the sensor, especially when close to instability. This dt must be used
     # only in the trial and error phase to find a rough estimation of the clamping
     # point location that leads to the sensor equilibrium
 
@@ -590,13 +584,13 @@ def getMetafor(d={}):
         hcurves.add(9, ext_becu, MaxOperator(), 'Max_VonMises_BeCu')
         hcurves.add(14, ext_invar, MaxOperator(), 'Max_VonMises_Invar')
 
-        # 👉 Ajout des déplacements verticaux de p10 et p11 (correction: minuscules)
+        # Addition of vertical displacements of p10 and p11
         hcurves.add(10, DbNodalValueExtractor(p10, Field1D(TY, RE)), SumOperator(), 'dispY_Bottom left mass corner')
         hcurves.add(11, DbNodalValueExtractor(p11, Field1D(TY, RE)), SumOperator(), 'dispY_Bottom right mass corner')
         hcurves.add(12, DbNodalValueExtractor(p12, Field1D(TY, RE)), SumOperator(), 'dispY_Top right mass corner')
         hcurves.add(13, DbNodalValueExtractor(p9, Field1D(TY, RE)), SumOperator(), 'dispY_Top left mass corner')
 
-        for i in range(1, 15):  # Ajusté jusqu'à 13 inclus
+        for i in range(1, 15):  # Adjusted up to 13 included
             metafor.getTestSuiteChecker().checkExtractor(i)
 
     # plot curves during simulation
@@ -621,15 +615,14 @@ def getMetafor(d={}):
 
     return metafor
 
-
 # ----------------------------------------------------------------------------------
 # Modal analysis to extract the sensor resonance frequencies and mode shapes
 from toolbox.utilities import *
 
 def read_max_stress(ascii_filename):
-    """Lit le fichier ASCII et retourne le max et l'instant correspondant."""
+    """Reads the ASCII file and returns the max and corresponding time."""
     if not os.path.exists(ascii_filename):
-        print(f" Fichier introuvable: {ascii_filename}")
+        print(f"File not found: {ascii_filename}")
         return None
 
     with open(ascii_filename, 'r') as f:
@@ -690,28 +683,27 @@ def postpro():
 
     print(f'eigenvalues = {[float(v) for v in txt[0].strip().split()]}')
 
-    # Lecture des valeurs maximales de Von Mises
+    # Reading the maximum Von Mises values
     files = {
         "Be-Cu": f'workspace/{os.path.splitext(os.path.basename(__file__))[0]}/Max_VonMises_BeCu.ascii',
         "Invar": f'workspace/{os.path.splitext(os.path.basename(__file__))[0]}/Max_VonMises_Invar.ascii'
     }
 
     for material, ascii_path in files.items():
-        print(f"Lecture du fichier: {ascii_path}")  # Impression de débogage
+        print(f"Reading file: {ascii_path}")  # Debug print
         if os.path.exists(ascii_path):
-            print(f"Fichier trouve: {ascii_path}")  # Impression de débogage
+            print(f"File found: {ascii_path}")  # Debug print
             with open(ascii_path, 'r') as f:
                 lines = [line.strip().split() for line in f if line.strip()]
                 if lines:
                     times, values = zip(*[(float(t), float(v)) for t, v in lines])
                     max_val = max(values)
                     max_time = times[values.index(max_val)]
-                    print(f"{material}: Contrainte de Von Mises maximale = {max_val:.2f} MPa à t = {max_time:.2f} s")
+                    print(f"{material}: Maximum Von Mises stress = {max_val:.2f} MPa at t = {max_time:.2f} s")
                 else:
-                    print(f"Fichier vide: {ascii_path}")  # Impression de débogage
+                    print(f"Empty file: {ascii_path}")  # Debug print
         else:
-            print(f"Fichier introuvable: {ascii_path}")  # Impression de débogage
-
+            print(f"File not found: {ascii_path}")  # Debug print
 
 # ----------------------------------------------------------------------------------
 

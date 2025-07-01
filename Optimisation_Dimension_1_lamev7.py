@@ -369,17 +369,17 @@ class ModularBladeConfig:
         """Find all possible configurations"""
         all_configs = {}
 
-        # L constant
+        # L constant - UTILISEZ LA VALEUR DÉSIRÉE ICI
         all_configs['L_constant_optimal'] = self.generate_configs(
-            ConfigurationType.L_CONSTANT, self.length_ref, VariationMode.OPTIMAL)
+            ConfigurationType.L_CONSTANT, self.length_ref, VariationMode.OPTIMAL)  # Au lieu de self.length_ref
 
         # h constant
         all_configs['h_constant_optimal'] = self.generate_configs(
-            ConfigurationType.H_CONSTANT, self.thickness_ref, VariationMode.OPTIMAL)
+            ConfigurationType.H_CONSTANT, self.thickness_ref, VariationMode.OPTIMAL) # Au lieu de self.thickness_ref
 
         # w constant
         all_configs['w_constant_optimal'] = self.generate_configs(
-            ConfigurationType.W_CONSTANT, self.width_ref, VariationMode.OPTIMAL)
+            ConfigurationType.W_CONSTANT, 55.0, VariationMode.OPTIMAL) # Au lieu de self.width_ref
 
         return all_configs
 
