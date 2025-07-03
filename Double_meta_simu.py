@@ -43,16 +43,16 @@ class BladeConfig:
         self.length = 105.25 # current length (L)
         self.width = 30.0  # current width
 
-        # Material selection: 'BE_CU', 'INVAR', 'STEEL'
+        # Material selection: 'BE_CU', 'INVAR', 'INVAR_CW_HARD'
         self.material = 'BE_CU'
 
         # --- Inner blade (Invar)
         self.inner_thickness = 0.24
         self.inner_length = 102.0 # Calculated automatically after based on the outer blade length so useless here
-        self.inner_width = 22.5
+        self.inner_width = 20.0
 
-        # Material selection: 'BE_CU', 'INVAR'
-        self.inner_material = 'INVAR'
+        # Material selection: 'BE_CU', 'INVAR', 'INVAR_CW_HARD'
+        self.inner_material = 'INVAR_CW_HARD'
 
         # --- Offset between blades (mm)
         self.inner_offset = 0.25
@@ -143,6 +143,8 @@ class BladeConfig:
         if self.material == 'BE_CU':
             E = 131e3
         elif self.material == 'INVAR':
+            E = 141e3
+        elif self.material == 'INVAR_CW_HARD':
             E = 141e3
         else:  # STEEL
             E = 210e3
@@ -336,6 +338,41 @@ def setup_temperature_dependent_properties(material):
         fctCTE.setData(310.15, 1.4e-6)
         fctCTE.setData(320.15, 1.5e-6)
         fctCTE.setData(323.15, 1.6e-6)
+
+    elif material == 'INVAR_CW_HARD':
+        fctE = PieceWiseLinearFunction()
+        fctE.setData(-260 + 273.15, 126e3)
+        fctE.setData(-187 + 273.15, 129e3)
+        fctE.setData(-114 + 273.15, 133e3)
+        fctE.setData(-40.2 + 273.15, 139e3)
+        fctE.setData(33.2 + 273.15, 144e3)
+        fctE.setData(107 + 273.15, 149e3)
+        fctE.setData(180 + 273.15, 153e3)
+        fctE.setData(253 + 273.15, 156e3)
+        fctE.setData(327 + 273.15, 157e3)
+        fctE.setData(400 + 273.15, 155e3)
+
+        fctCTE = PieceWiseLinearFunction()
+        fctCTE.setData(-260 + 273.15, 1.41e-6)
+        fctCTE.setData(-221 + 273.15, 1.64e-6)
+        fctCTE.setData(-182 + 273.15, 1.90e-6)
+        fctCTE.setData(-143 + 273.15, 1.87e-6)
+        fctCTE.setData(-104 + 273.15, 1.67e-6)
+        fctCTE.setData(-65.4 + 273.15, 1.44e-6)
+        fctCTE.setData(-26.5 + 273.15, 1.27e-6)
+        fctCTE.setData(12.5 + 273.15, 1.20e-6)
+        fctCTE.setData(51.4 + 273.15, 1.26e-6)
+        fctCTE.setData(90.4 + 273.15, 1.44e-6)
+        fctCTE.setData(129 + 273.15, 1.76e-6)
+        fctCTE.setData(168 + 273.15, 2.21e-6)
+        fctCTE.setData(207 + 273.15, 2.86e-6)
+        fctCTE.setData(246 + 273.15, 3.81e-6)
+        fctCTE.setData(285 + 273.15, 5.5e-6)
+        fctCTE.setData(324 + 273.15, 7.08e-6)
+        fctCTE.setData(363 + 273.15, 8.16e-6)
+        fctCTE.setData(402 + 273.15, 8.87e-6)
+        fctCTE.setData(441 + 273.15, 9.48e-6)
+        fctCTE.setData(480 + 273.15, 10.1e-6)
 
     else:
         raise ValueError(f"Unsupported material: {material}")
@@ -635,6 +672,26 @@ def getMetafor(d={}):
         laws(2).put(IH_SIGEL, 250.0)  # Approximate elastic limit for Invar (~250 MPa): Elastic Limit: 240-725 MPa https://www.azom.com/properties.aspx?ArticleID=515
         laws(2).put(IH_H, 600.0)  # Hardening modulus Invar (moderate value) : h = 500-800 MPa
         yield_num = 2
+        #https://www.carpentertechnology.com/hubfs/7407324/Material%20Saftey%20Data%20Sheets/Invar%2036.pdf
+        #https://www.carpentertechnology.com/hubfs/7407324/Material%20Saftey%20Data%20Sheets/Super%20Invar%2032-5.pdf
+    elif blade_config.material == 'INVAR_CW_HARD':
+        laws.define(7, LinearIsotropicHardening)
+        fctSigY = PieceWiseLinearFunction()
+        fctSigY.setData(-260 + 273.15, 1090.0)
+        fctSigY.setData(-229 + 273.15, 1000.0)
+        fctSigY.setData(-198 + 273.15, 924.0)
+        fctSigY.setData(-167 + 273.15, 860.0)
+        fctSigY.setData(-136 + 273.15, 805.0)
+        fctSigY.setData(-105 + 273.15, 759.0)
+        fctSigY.setData(-73.5 + 273.15, 720.0)
+        fctSigY.setData(-42.4 + 273.15, 686.0)
+        fctSigY.setData(-11.3 + 273.15, 655.0)
+        fctSigY.setData(19.9 + 273.15, 627.0)
+        fctSigY.setData(25.0 + 273.15, 622.0)
+
+        laws(7).put(IH_H, 700.0)
+        laws(7).put(IH_SIGEL, fctSigY.evaluate(283.15))
+        yield_num = 7
     else:
         raise ValueError(f"Unsupported material: {blade_config.material}")
 
@@ -654,6 +711,24 @@ def getMetafor(d={}):
         laws(6).put(IH_SIGEL, 250.0)  # Approximate elastic limit for Invar (~250 MPa): Elastic Limit: 240-725 MPa https://www.azom.com/properties.aspx?ArticleID=515
         laws(6).put(IH_H, 600.0)  # Hardening modulus Invar (moderate value) : h = 500-800 MPa
         inner_yield_num = 6
+    elif blade_config.inner_material  == 'INVAR_CW_HARD':
+        laws.define(8, LinearIsotropicHardening)
+        fctSigY = PieceWiseLinearFunction()
+        fctSigY.setData(-260 + 273.15, 1090.0)
+        fctSigY.setData(-229 + 273.15, 1000.0)
+        fctSigY.setData(-198 + 273.15, 924.0)
+        fctSigY.setData(-167 + 273.15, 860.0)
+        fctSigY.setData(-136 + 273.15, 805.0)
+        fctSigY.setData(-105 + 273.15, 759.0)
+        fctSigY.setData(-73.5 + 273.15, 720.0)
+        fctSigY.setData(-42.4 + 273.15, 686.0)
+        fctSigY.setData(-11.3 + 273.15, 655.0)
+        fctSigY.setData(19.9 + 273.15, 627.0)
+        fctSigY.setData(25.0 + 273.15, 622.0)
+
+        laws(8).put(IH_H, 700.0)
+        laws(8).put(IH_SIGEL, fctSigY.evaluate(283.15))
+        inner_yield_num = 8
     else:
         raise ValueError(f"Unsupported material: {blade_config.material}")
 
@@ -677,6 +752,13 @@ def getMetafor(d={}):
             materials(1).put(POISSON_RATIO, 0.29)
             materials(1).put(CONDUCTIVITY, 10.0)
             materials(1).put(HEAT_CAPACITY, 500.e6)
+            materials(1).put(ELASTIC_MODULUS, 1.0)
+            materials(1).put(THERM_EXPANSION, 1.0)
+        elif blade_config.material == 'INVAR_CW_HARD':
+            materials(1).put(MASS_DENSITY, 8.15e-9)  # kg/mm^3
+            materials(1).put(POISSON_RATIO, 0.29)
+            materials(1).put(CONDUCTIVITY, 13.9)
+            materials(1).put(HEAT_CAPACITY, 479e6)  # µJ/kg.K
             materials(1).put(ELASTIC_MODULUS, 1.0)
             materials(1).put(THERM_EXPANSION, 1.0)
 
@@ -703,6 +785,14 @@ def getMetafor(d={}):
             materials(5).put(HEAT_CAPACITY, 500.e6)
             materials(5).put(ELASTIC_MODULUS, 1.0)
             materials(5).put(THERM_EXPANSION, 1.0)
+        elif blade_config.inner_material == 'INVAR_CW_HARD':
+            materials(5).put(MASS_DENSITY, 8.15e-9)  # kg/mm^3
+            materials(5).put(POISSON_RATIO, 0.29)
+            materials(5).put(CONDUCTIVITY, 13.9)
+            materials(5).put(HEAT_CAPACITY, 479e6)  # µJ/kg.K
+            materials(5).put(ELASTIC_MODULUS, 1.0)
+            materials(5).put(THERM_EXPANSION, 1.0)
+
         materials(5).depend(ELASTIC_MODULUS, fctE, Field1D(TO, RE))
         materials(5).depend(THERM_EXPANSION, fctCTE, Field1D(TO, RE))
         materials(5).put(DISSIP_TE, 0.0)
@@ -735,6 +825,10 @@ def getMetafor(d={}):
             materials(1).put(MASS_DENSITY, 8.1e-9)
             materials(1).put(POISSON_RATIO, 0.29)
             materials(1).put(ELASTIC_MODULUS, 141e3)  # Value
+        elif blade_config.material == 'INVAR_CW_HARD':
+            materials(1).put(MASS_DENSITY, 8.15e-9)
+            materials(1).put(POISSON_RATIO, 0.29)
+            materials(1).put(ELASTIC_MODULUS, 141e3)
 
         materials(1).put(YIELD_NUM, yield_num)
 
@@ -748,6 +842,10 @@ def getMetafor(d={}):
             materials(5).put(MASS_DENSITY, 8.1e-9)
             materials(5).put(POISSON_RATIO, 0.29)
             materials(5).put(ELASTIC_MODULUS, 141e3)  # Value
+        elif blade_config.inner_material == 'INVAR_CW_HARD':
+            materials(5).put(MASS_DENSITY, 8.15e-9)
+            materials(5).put(POISSON_RATIO, 0.29)
+            materials(5).put(ELASTIC_MODULUS, 141e3)
 
         materials(5).put(YIELD_NUM, inner_yield_num)
 
@@ -801,15 +899,12 @@ def getMetafor(d={}):
     app5.addProperty(prp5)
     domain.getInteractionSet().add(app5)
 
-
     # Structure properties
     prp2.put(MATERIAL, 2)
     prp2.put(CAUCHYMECHVOLINTMETH, VES_CMVIM_SRIPR)
     prp2.put(THICKNESS, 63.0)
     prp2.put(GRAVITY_Y, -9.81e3)
     prp2.depend(GRAVITY_Y, fctG, Field1D(TM))
-
-
 
 
     app2 = FieldApplicator(2)
@@ -1673,6 +1768,8 @@ def getMetafor(d={}):
 
                 if blade_config.material == 'INVAR':
                     elastic_limit = 250.0  # MPa
+                elif blade_config.material == 'INVAR_CW_HARD':
+                    elastic_limit = 650.0  # MPa
                 elif blade_config.material == 'BE_CU':
                     elastic_limit = 1000.0  # MPa
 
@@ -1705,6 +1802,8 @@ def getMetafor(d={}):
 
                 if blade_config.inner_material == 'INVAR':
                     elastic_limit = 250.0  # MPa
+                elif blade_config.material == 'INVAR_CW_HARD':
+                    elastic_limit = 650.0  # MPa
                 elif blade_config.inner_material == 'BE_CU':
                     elastic_limit = 1000.0  # MPa
 
@@ -2635,7 +2734,8 @@ def additional_diagnostics(blade_config):
     # Define material properties for reference
     material_properties = {
         'BE_CU': {'elastic_limit': 1000.0, 'hardening': 1000.0},
-        'INVAR': {'elastic_limit': 250.0, 'hardening': 600.0}
+        'INVAR': {'elastic_limit': 250.0, 'hardening': 600.0},
+        'INVAR_CW_HARD': {'elastic_limit': 650.0, 'hardening': 700.0}
     }
 
     # Determine current material (you'll need to pass this or detect it)
@@ -2848,7 +2948,8 @@ def additional_diagnostics(blade_config):
     # Define material properties for reference
     material_properties_inner = {
         'BE_CU': {'elastic_limit': 1000.0, 'hardening': 1000.0},
-        'INVAR': {'elastic_limit': 250.0, 'hardening': 600.0}
+        'INVAR': {'elastic_limit': 250.0, 'hardening': 600.0},
+        'INVAR_CW_HARD': {'elastic_limit': 650.0, 'hardening': 700.0}
     }
 
     # Use Invar properties for the inner blade
