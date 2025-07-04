@@ -20,6 +20,107 @@ StrVectorBase.useTBB(True)
 StrMatrixBase.useTBB(True)
 ContactInteraction.useTBB(True)
 
+# =============================================================================
+# EXECUTION GUIDE
+# =============================================================================
+# This script operates in a two-step workflow:
+#
+# 1. STEP 1: SIMULATION PHASE
+#    - The getMetafor() function builds the Finite Element model.
+#    - To run the simulation, this function must be called from a Metafor
+#      interactive environment by selecting the file and starting a metafor time integration
+#    - This step generates numerous data files (.ascii and .v) in the working directory.
+#
+# 2. STEP 2: POST-PROCESSING PHASE
+#    - Once the simulation is complete, simply run this script again
+#      directly from the metafor terminal by clicking "Execute".
+#    - This will execute the `if __name__ == "__main__":` block below, which
+#      loads the simulation results and performs the analyses (modal, thermal, etc.).
+# =============================================================================
+
+
+
+# =============================================================================
+# HOW TO CHANGE PARAMETERS
+# =============================================================================
+# All primary simulation parameters can be modified in two main places:
+# 1. The global `USE_DUAL_BLADE` variable.
+# 2. Within the `__init__` methods of the `BladeConfig` and `SimulationConfig` classes.
+#
+# Below is a guide to the most important parameters.
+# ---
+
+### 🔧 1. Global Sensor Configuration
+
+# USE_DUAL_BLADE = True
+# This is the main switch to define the sensor type.
+# - True: Simulates the sensor with two blades (For exemple : Be-Cu and Invar) for thermal compensation.
+# - False: Simulates the sensor with only a single outer blade.
+
+### 📐 2. Blade and Geometry Configuration (in class BladeConfig)
+
+# class BladeConfig:
+#     def __init__(self):
+#
+# --- Outer Blade Geometry & Material ---
+#         self.thickness = 0.24       # Thickness of the outer blade in mm.
+#         self.length = 105.25        # Length of the outer blade in mm.
+#         self.width = 30.0           # Width (extrusion depth) of the outer blade in mm.
+#
+#         self.material = 'BE_CU'     # Material for the outer blade.
+#                                     # Options: 'BE_CU', 'INVAR', 'INVAR_CW_HARD'.
+#
+# --- Inner Blade Geometry & Material (only used if USE_DUAL_BLADE is True) ---
+#         self.inner_thickness = 0.24 # Thickness of the inner blade in mm.
+#         self.inner_width = 20.0     # Width of the inner blade in mm.
+#         self.inner_offset = 0.25    # Gap between the inner and outer blades in mm.
+#
+#         self.inner_material = 'INVAR_CW_HARD' # Material for the inner blade.
+#                                               # Options: 'BE_CU', 'INVAR', 'INVAR_CW_HARD'.
+#
+# --- Meshing Parameters ---
+#         self.elements_thickness = 8 # Number of elements through the blade's thickness.
+#         self.elements_length_factor = 20 # Factor to determine elements along the length (Length * factor).
+#                                          # Higher values mean a finer mesh (more accurate, but slower).
+#
+# --- Clamping Calculation ---
+#         self.Dx_fixe = False        # Controls how the clamping position Dx is calculated.
+#                                     # - False: Dx is calculated to form a perfect semicircle.
+#                                     # - True: Dx uses a fixed experimental value.
+
+### ⚙️ 3. Simulation and Analysis Configuration (in class SimulationConfig)
+
+# class SimulationConfig:
+#     def __init__(self, blade_config):
+#
+# --- Time Settings ---
+#         self.final_time = 30.0          # Total duration of the simulation in seconds for mechanical only.
+#         self.loading_time = 10.0        # Time taken to bend the blade into shape (mechanical loading).
+#         self.stabilization_time = 12.0  # A time marker for stabilization checks.
+#
+# --- Thermal Analysis Settings ---
+#         self.enable_thermal = False         # Master switch for thermal analysis.
+#                                             # - True: Applies a temperature change.
+#                                             # - False: Runs a purely mechanical simulation.
+#
+#         self.temp_initial_kelvin = 273.15 + 10.0 # Initial temperature of the system (Kelvin).
+#         self.temp_final_kelvin = 273.15 + 50.0   # Final temperature of the system (Kelvin).
+#         self.temp_start_time = 20.0     # Time (in seconds) when the temperature starts to change.
+#         self.temp_end_time = 35.0       # Total duration of the simulation in seconds for thermal test.
+#                                         # The temperature increase from 20 to 30s and then the system stabilise from 30 to 35s
+#
+# --- Data & Plotting Settings ---
+#         self.enable_plasticityData = True   # - True: Calculates and saves all plasticity-related data (stress, strain, etc.).
+#                                             # - False: Skips plasticity calculations to speed up the simulation.
+#                                             #   Recommended: True for 'INVAR', False for 'BE_CU'.
+#
+# --- Timestep Control ---
+#         self.adaptive_timestep = True   # - True: The solver automatically adjusts the time step size for speed and stability.
+#                                         # - False: The solver uses a fixed time step size defined below.
+#
+#         self.fixed_timestep_size = 0.02 # The fixed time step size used when adaptive_timestep is False.
+# =============================================================================
+
 
 # =============================================================================
 # Optimized configuration for a 0 to 1mm stabilization
@@ -28,6 +129,7 @@ ContactInteraction.useTBB(True)
 import numpy as np
 from math import sqrt, pi, cos, sin, atan2
 
+USE_DUAL_BLADE = True # <--  True = 2 blades, False = 1 blade
 
 class BladeConfig:
     """Configuration parameters for the blade with systematic compensation"""
@@ -46,8 +148,8 @@ class BladeConfig:
         # Material selection: 'BE_CU', 'INVAR', 'INVAR_CW_HARD'
         self.material = 'BE_CU'
 
-        # --- Inner blade
-        self.inner_thickness = 0.23
+        # --- Inner blade (Invar)
+        self.inner_thickness = 0.24
         self.inner_length = 102.0 # Calculated automatically after based on the outer blade length so useless here
         self.inner_width = 20.0
 
@@ -207,8 +309,8 @@ class BladeConfig:
 
         # To avoid the two blade going though each other
         if self.material == "BE_CU" and self.inner_material == "INVAR":
-            Li *= 1
-            Dx_invar *= 1
+            Li *= 0.99
+            Dx_invar *= 0.99
 
         return {
             'ei': ei,
@@ -244,7 +346,7 @@ class SimulationConfig:
         self.stabilization_time = 12.0
 
         # Temperature parameters
-        self.enable_thermal = True
+        self.enable_thermal = False
         self.temp_initial_kelvin = 273.15 + 10.0
         self.temp_final_kelvin = 273.15 + 50.0
         self.temp_start_time = 20.0
@@ -385,6 +487,8 @@ def getMetafor(d={}):
     """
     Optimized main function with physics-based compensation
     """
+    global USE_DUAL_BLADE
+    use_dual_blade = USE_DUAL_BLADE
 
     # Initialize configurations with physics-based optimization
     blade_config, sim_config, warnings = setup_optimized_blade_system(d)
@@ -516,19 +620,16 @@ def getMetafor(d={}):
     # Spring
     p30 = pointset.define(30, 0.0, -H / 2)
 
-    # New Invar leaf spring (side by side with the Be-Cu blade)
-    p31 = pointset.define(31, enc - ei - offset, H / 2)  # Bottom left point Invar blade
-    p32 = pointset.define(32, enc - offset, H / 2)  # Bottom right point Invar blade
-    p33 = pointset.define(33, enc - offset, Li)  # Top right point Invar blade
-    p34 = pointset.define(34, enc - ei - offset, Li)  # Top left point Invar blade
-
-    # Compatibility planes for Invar blade
-    p35 = pointset.define(35, enc - ei - 0.1, -H / 2)  # Left median plane point Invar blade
-    p36 = pointset.define(36, enc - 0.1, -H / 2)  # Right median plane point Invar blade
-
-    # Median plane
-    p37 = pointset.define(37, enc - ei - 0.1, 0.0)
-    p38 = pointset.define(38, enc - 0.1, 0.0)
+    if use_dual_blade:
+        # New inner blade
+        p31 = pointset.define(31, enc - ei - offset, H / 2) # Bottom left point
+        p32 = pointset.define(32, enc - offset, H / 2) # Bottom right point
+        p33 = pointset.define(33, enc - offset, Li) # Top right point
+        p34 = pointset.define(34, enc - ei - offset, Li) # Top left poin
+        p35 = pointset.define(35, enc - ei - 0.1, -H / 2) # Left median plane point
+        p36 = pointset.define(36, enc - 0.1, -H / 2) # Right median plane point
+        p37 = pointset.define(37, enc - ei - 0.1, 0.0)
+        p38 = pointset.define(38, enc - 0.1, 0.0)
 
     curveset = geometry.getCurveSet()
     # blade
@@ -574,11 +675,11 @@ def getMetafor(d={}):
     # Median plane Invar blade
     c34 = curveset.add(Line(34, p37, p38))
 
-    # Invar leaf spring
-    c30 = curveset.add(Line(30, p31, p32))
-    c31 = curveset.add(Line(31, p38, p33))
-    c32 = curveset.add(Line(32, p33, p34))
-    c33 = curveset.add(Line(33, p34, p37))
+    if use_dual_blade:
+        c30 = curveset.add(Line(30, p31, p32))
+        c31 = curveset.add(Line(31, p38, p33))
+        c32 = curveset.add(Line(32, p33, p34))
+        c33 = curveset.add(Line(33, p34, p37))
 
     wireset = geometry.getWireSet()
     w1 = wireset.add(Wire(1, [c28, c2, c3, c4]))
@@ -588,8 +689,8 @@ def getMetafor(d={}):
     w5 = wireset.add(Wire(5, [c19, c18, c22, c23, c24, c25]))
     w6 = wireset.add(Wire(6, [c26]))
 
-    # Wire for the Invar blade
-    w7 = wireset.add(Wire(7, [c34, c31, c32, c33]))
+    if use_dual_blade:
+        w7 = wireset.add(Wire(7, [c34, c31, c32, c33]))
 
     sideset = geometry.getSideSet()
     s1 = sideset.add(Side(1, [w1]))
@@ -599,8 +700,8 @@ def getMetafor(d={}):
     s5 = sideset.add(Side(5, [w5]))
     s6 = sideset.add(Side(6, [w6]))
 
-    # Side for the Invar blade
-    s7 = sideset.add(Side(7, [w7]))
+    if use_dual_blade:
+        s7 = sideset.add(Side(7, [w7]))
 
     # Mesh
     prog = 5
@@ -642,11 +743,12 @@ def getMetafor(d={}):
     SimpleMesher1D(c28).execute(ne)
     SimpleMesher1D(c29).execute(n9)
     SimpleMesher1D(c34).execute(ne)
-    # New curves for the Invar blade
-    SimpleMesher1D(c30).execute(ne)
-    SimpleMesher1D(c31).execute(nL)
-    SimpleMesher1D(c32).execute(ne)
-    SimpleMesher1D(c33).execute(nL)
+
+    if use_dual_blade:
+        SimpleMesher1D(c30).execute(ne)
+        SimpleMesher1D(c31).execute(nL)
+        SimpleMesher1D(c32).execute(ne)
+        SimpleMesher1D(c33).execute(nL)
 
     # 2. Modified transfinite mesh
     TransfiniteMesher2D(s1).execute(True) #Outer blade
@@ -654,7 +756,8 @@ def getMetafor(d={}):
     TransfiniteMesher2D(s3).execute2((6, (71, 72, 73, 8, 9), 10, (29, 28, 272, 34, 271))) #Lower part of left rod
     TransfiniteMesher2D(s4).execute2(((14, 11, 10, 15), 16, (17, 18, 19, 20), 21)) #Main mass body
     TransfiniteMesher2D(s5).execute2(((19, 18), 22, (23, 24), 25)) #Rigth rod
-    TransfiniteMesher2D(s7).execute(True) #Inner blade
+    if use_dual_blade:
+        TransfiniteMesher2D(s7).execute(True)
 
     # OPTIMIZED MATERIALS - Temperature dependent Be-Cu
     materials = domain.getMaterialSet()
@@ -700,37 +803,37 @@ def getMetafor(d={}):
     laws(3).put(IH_SIGEL, 400.0)  # Elastic limit for steel
     laws(3).put(IH_H, 1000.0)  # Hardening modulus
 
-    #Inner blade configuration
-    if blade_config.inner_material == 'BE_CU':
-        laws.define(5, LinearIsotropicHardening)
-        laws(5).put(IH_SIGEL, 1000.0)  # Approximate elastic limit for BE-CU (~1000 MPa)
-        laws(5).put(IH_H, 1000.0)  # Hardening modulus BE-CU (moderate value)
-        inner_yield_num = 5
-    elif blade_config.inner_material == 'INVAR':
-        laws.define(6, LinearIsotropicHardening)
-        laws(6).put(IH_SIGEL, 250.0)  # Approximate elastic limit for Invar (~250 MPa): Elastic Limit: 240-725 MPa https://www.azom.com/properties.aspx?ArticleID=515
-        laws(6).put(IH_H, 600.0)  # Hardening modulus Invar (moderate value) : h = 500-800 MPa
-        inner_yield_num = 6
-    elif blade_config.inner_material  == 'INVAR_CW_HARD':
-        laws.define(8, LinearIsotropicHardening)
-        fctSigY = PieceWiseLinearFunction()
-        fctSigY.setData(-260 + 273.15, 1090.0)
-        fctSigY.setData(-229 + 273.15, 1000.0)
-        fctSigY.setData(-198 + 273.15, 924.0)
-        fctSigY.setData(-167 + 273.15, 860.0)
-        fctSigY.setData(-136 + 273.15, 805.0)
-        fctSigY.setData(-105 + 273.15, 759.0)
-        fctSigY.setData(-73.5 + 273.15, 720.0)
-        fctSigY.setData(-42.4 + 273.15, 686.0)
-        fctSigY.setData(-11.3 + 273.15, 655.0)
-        fctSigY.setData(19.9 + 273.15, 627.0)
-        fctSigY.setData(25.0 + 273.15, 622.0)
+    if use_dual_blade:
+        if blade_config.inner_material == 'BE_CU':
+            laws.define(5, LinearIsotropicHardening)
+            laws(5).put(IH_SIGEL, 1000.0)  # Approximate elastic limit for BE-CU (~1000 MPa)
+            laws(5).put(IH_H, 1000.0)  # Hardening modulus BE-CU (moderate value)
+            inner_yield_num = 5
+        elif blade_config.inner_material == 'INVAR':
+            laws.define(6, LinearIsotropicHardening)
+            laws(6).put(IH_SIGEL, 250.0)  # Approximate elastic limit for Invar (~250 MPa): Elastic Limit: 240-725 MPa https://www.azom.com/properties.aspx?ArticleID=515
+            laws(6).put(IH_H, 600.0)  # Hardening modulus Invar (moderate value) : h = 500-800 MPa
+            inner_yield_num = 6
+        elif blade_config.inner_material  == 'INVAR_CW_HARD':
+            laws.define(8, LinearIsotropicHardening)
+            fctSigY = PieceWiseLinearFunction()
+            fctSigY.setData(-260 + 273.15, 1090.0)
+            fctSigY.setData(-229 + 273.15, 1000.0)
+            fctSigY.setData(-198 + 273.15, 924.0)
+            fctSigY.setData(-167 + 273.15, 860.0)
+            fctSigY.setData(-136 + 273.15, 805.0)
+            fctSigY.setData(-105 + 273.15, 759.0)
+            fctSigY.setData(-73.5 + 273.15, 720.0)
+            fctSigY.setData(-42.4 + 273.15, 686.0)
+            fctSigY.setData(-11.3 + 273.15, 655.0)
+            fctSigY.setData(19.9 + 273.15, 627.0)
+            fctSigY.setData(25.0 + 273.15, 622.0)
 
-        laws(8).put(IH_H, 700.0)
-        laws(8).put(IH_SIGEL, fctSigY.evaluate(283.15))
-        inner_yield_num = 8
-    else:
-        raise ValueError(f"Unsupported material: {blade_config.material}")
+            laws(8).put(IH_H, 700.0)
+            laws(8).put(IH_SIGEL, fctSigY.evaluate(283.15))
+            inner_yield_num = 8
+        else:
+            raise ValueError(f"Unsupported material: {blade_config.material}")
 
 
     # Setup temperature-dependent functions
@@ -769,35 +872,36 @@ def getMetafor(d={}):
         materials(1).put(YIELD_NUM, yield_num)
         # Note: No YIELD_NUM and TmElastHypoMaterial if elastic only: Use TmEvpIsoHHypoMaterial if plastic
 
-        #Inner blade
-        materials.define(5, TmEvpIsoHHypoMaterial)
-        if blade_config.inner_material == 'BE_CU':
-            materials(5).put(MASS_DENSITY, 8.36e-9)
-            materials(5).put(POISSON_RATIO, 0.285)
-            materials(5).put(CONDUCTIVITY, 105.0)
-            materials(5).put(HEAT_CAPACITY, 420.e6)
-            materials(5).put(ELASTIC_MODULUS, 1.0)
-            materials(5).put(THERM_EXPANSION, 1.0)
-        elif blade_config.inner_material == 'INVAR':
-            materials(5).put(MASS_DENSITY, 8.1e-9)
-            materials(5).put(POISSON_RATIO, 0.29)
-            materials(5).put(CONDUCTIVITY, 10.0)
-            materials(5).put(HEAT_CAPACITY, 500.e6)
-            materials(5).put(ELASTIC_MODULUS, 1.0)
-            materials(5).put(THERM_EXPANSION, 1.0)
-        elif blade_config.inner_material == 'INVAR_CW_HARD':
-            materials(5).put(MASS_DENSITY, 8.15e-9)  # kg/mm^3
-            materials(5).put(POISSON_RATIO, 0.29)
-            materials(5).put(CONDUCTIVITY, 13.9)
-            materials(5).put(HEAT_CAPACITY, 479e6)  # µJ/kg.K
-            materials(5).put(ELASTIC_MODULUS, 1.0)
-            materials(5).put(THERM_EXPANSION, 1.0)
+        if use_dual_blade:
+            #Inner blade
+            materials.define(5, TmEvpIsoHHypoMaterial)
+            if blade_config.inner_material == 'BE_CU':
+                materials(5).put(MASS_DENSITY, 8.36e-9)
+                materials(5).put(POISSON_RATIO, 0.285)
+                materials(5).put(CONDUCTIVITY, 105.0)
+                materials(5).put(HEAT_CAPACITY, 420.e6)
+                materials(5).put(ELASTIC_MODULUS, 1.0)
+                materials(5).put(THERM_EXPANSION, 1.0)
+            elif blade_config.inner_material == 'INVAR':
+                materials(5).put(MASS_DENSITY, 8.1e-9)
+                materials(5).put(POISSON_RATIO, 0.29)
+                materials(5).put(CONDUCTIVITY, 10.0)
+                materials(5).put(HEAT_CAPACITY, 500.e6)
+                materials(5).put(ELASTIC_MODULUS, 1.0)
+                materials(5).put(THERM_EXPANSION, 1.0)
+            elif blade_config.inner_material == 'INVAR_CW_HARD':
+                materials(5).put(MASS_DENSITY, 8.15e-9)  # kg/mm^3
+                materials(5).put(POISSON_RATIO, 0.29)
+                materials(5).put(CONDUCTIVITY, 13.9)
+                materials(5).put(HEAT_CAPACITY, 479e6)  # µJ/kg.K
+                materials(5).put(ELASTIC_MODULUS, 1.0)
+                materials(5).put(THERM_EXPANSION, 1.0)
 
-        materials(5).depend(ELASTIC_MODULUS, fctE, Field1D(TO, RE))
-        materials(5).depend(THERM_EXPANSION, fctCTE, Field1D(TO, RE))
-        materials(5).put(DISSIP_TE, 0.0)
-        materials(5).put(DISSIP_TQ, 0.0)
-        materials(5).put(YIELD_NUM, inner_yield_num)
+            materials(5).depend(ELASTIC_MODULUS, fctE, Field1D(TO, RE))
+            materials(5).depend(THERM_EXPANSION, fctCTE, Field1D(TO, RE))
+            materials(5).put(DISSIP_TE, 0.0)
+            materials(5).put(DISSIP_TQ, 0.0)
+            materials(5).put(YIELD_NUM, inner_yield_num)
 
 
         # Structure material - Use TmElastHypoMaterial also for coherence
@@ -828,26 +932,27 @@ def getMetafor(d={}):
         elif blade_config.material == 'INVAR_CW_HARD':
             materials(1).put(MASS_DENSITY, 8.15e-9)
             materials(1).put(POISSON_RATIO, 0.29)
-            materials(1).put(ELASTIC_MODULUS, fctE.evaluate(283.15))
+            materials(1).put(ELASTIC_MODULUS, 141e3)
 
         materials(1).put(YIELD_NUM, yield_num)
 
-        # Inner blade
-        materials.define(5, EvpIsoHHypoMaterial)
-        if blade_config.inner_material == 'BE_CU':
-            materials(5).put(MASS_DENSITY, 8.36e-9)
-            materials(5).put(POISSON_RATIO, 0.285)
-            materials(5).put(ELASTIC_MODULUS, 131e3)  # Value
-        elif blade_config.inner_material == 'INVAR':
-            materials(5).put(MASS_DENSITY, 8.1e-9)
-            materials(5).put(POISSON_RATIO, 0.29)
-            materials(5).put(ELASTIC_MODULUS, 141e3)  # Value
-        elif blade_config.inner_material == 'INVAR_CW_HARD':
-            materials(5).put(MASS_DENSITY, 8.15e-9)
-            materials(5).put(POISSON_RATIO, 0.29)
-            materials(5).put(ELASTIC_MODULUS, fctE.evaluate(283.15))
+        if use_dual_blade:
+            # Inner blade
+            materials.define(5, EvpIsoHHypoMaterial)
+            if blade_config.inner_material == 'BE_CU':
+                materials(5).put(MASS_DENSITY, 8.36e-9)
+                materials(5).put(POISSON_RATIO, 0.285)
+                materials(5).put(ELASTIC_MODULUS, 131e3)  # Value
+            elif blade_config.inner_material == 'INVAR':
+                materials(5).put(MASS_DENSITY, 8.1e-9)
+                materials(5).put(POISSON_RATIO, 0.29)
+                materials(5).put(ELASTIC_MODULUS, 141e3)  # Value
+            elif blade_config.inner_material == 'INVAR_CW_HARD':
+                materials(5).put(MASS_DENSITY, 8.15e-9)
+                materials(5).put(POISSON_RATIO, 0.29)
+                materials(5).put(ELASTIC_MODULUS, 141e3)
 
-        materials(5).put(YIELD_NUM, inner_yield_num)
+            materials(5).put(YIELD_NUM, inner_yield_num)
 
         # Structure (Steel)
         materials.define(2, EvpIsoHHypoMaterial)
@@ -872,11 +977,13 @@ def getMetafor(d={}):
     if sim_config.enable_thermal:
         prp1 = ElementProperties(TmVolume2DElement)  # Blade
         prp2 = ElementProperties(TmVolume2DElement)  # Structure
-        prp5 = ElementProperties(TmVolume2DElement) #Inner blade
+        if use_dual_blade:
+            prp5 = ElementProperties(TmVolume2DElement) #Inner blade
     else:
         prp1 = ElementProperties(Volume2DElement)
         prp2 = ElementProperties(Volume2DElement)
-        prp5 = ElementProperties(Volume2DElement)
+        if use_dual_blade:
+            prp5 = ElementProperties(Volume2DElement)
 
     # Outer Blade properties
     prp1.put(MATERIAL, 1)
@@ -889,15 +996,16 @@ def getMetafor(d={}):
     app.addProperty(prp1)
     domain.getInteractionSet().add(app)
 
-    #Inner blade
-    prp5.put(MATERIAL, 5)
-    prp5.put(CAUCHYMECHVOLINTMETH, VES_CMVIM_SRIPR)
-    prp5.put(THICKNESS, blade_config.inner_width)
+    if use_dual_blade:
+        #Inner blade
+        prp5.put(MATERIAL, 5)
+        prp5.put(CAUCHYMECHVOLINTMETH, VES_CMVIM_SRIPR)
+        prp5.put(THICKNESS, blade_config.inner_width)
 
-    app5 = FieldApplicator(7)
-    app5.push(s7)
-    app5.addProperty(prp5)
-    domain.getInteractionSet().add(app5)
+        app5 = FieldApplicator(7)
+        app5.push(s7)
+        app5.addProperty(prp5)
+        domain.getInteractionSet().add(app5)
 
     # Structure properties
     prp2.put(MATERIAL, 2)
@@ -942,27 +1050,29 @@ def getMetafor(d={}):
     domain.getLoadingSet().define(p30, Field1D(TY,RE), 0.0) # hinge spring end fixed
     domain.getLoadingSet().define(p30, Field1D(TX,RE), 0.0) # hinge spring end fixed
 
-    # Rotation axis for the Be-Cu blade
+    # Rotation axis for the outer blade
     pa1 = pointset.define(23, enc + e / 2, L / 2)
     pa2 = pointset.define(24, enc + e / 2, L / 2, 1.0)
     axe1_BeCu = Axe(pa1, pa2)
     axe1_BeCu.setSymZ1(1.0)
 
-    # Rotation axis for the Invar blade
-    pa5 = pointset.define(41, enc - ei / 2 - offset, Li / 2)
-    pa6 = pointset.define(42, enc - ei / 2 - offset, Li / 2, 1.0)
-    axe1_Invar = Axe(pa5, pa6)
-    axe1_Invar.setSymZ1(1.0)
+    if use_dual_blade:
+        # Rotation axis for the inner blade
+        pa5 = pointset.define(41, enc - ei / 2 - offset, Li / 2)
+        pa6 = pointset.define(42, enc - ei / 2 - offset, Li / 2, 1.0)
+        axe1_Invar = Axe(pa5, pa6)
+        axe1_Invar.setSymZ1(1.0)
 
-    # For Be-Cu blade
+    # For outer blade
     pa3 = pointset.define(39, Dx + Dx1 + enc + e / 2, Dy, 0.0)
     pa4 = pointset.define(40, Dx + Dx1 + enc + e / 2, Dy, 1.0)
     axe2 = Axe(pa3, pa4)
 
-    # For Invar blade - ensure consistent spacing
-    pa3i = pointset.define(43, Dx + Dx1 + enc - ei / 2 - offset, Dy, 0.0)  # Adjusted x-coordinate
-    pa4i = pointset.define(44, Dx + Dx1 + enc - ei / 2 - offset, Dy, 1.0)
-    axe2_Invar = Axe(pa3i, pa4i)
+    if use_dual_blade:
+        # For inner blade - ensure consistent spacing
+        pa3i = pointset.define(43, Dx + Dx1 + enc - ei / 2 - offset, Dy, 0.0)  # Adjusted x-coordinate
+        pa4i = pointset.define(44, Dx + Dx1 + enc - ei / 2 - offset, Dy, 1.0)
+        axe2_Invar = Axe(pa3i, pa4i)
 
     # axis displacement
     fctX = PieceWiseLinearFunction()
@@ -973,13 +1083,14 @@ def getMetafor(d={}):
     fctX.setData(T_load, 1.0)
     fctX.setData(T, 1.0)
 
-    fctX_invar = PieceWiseLinearFunction()
-    fctX_invar.setData(0.0, 0.0)
-    fctX_invar.setData(T_load / 8, 0.0)
-    fctX_invar.setData(T_load / 2, Dx_invar / (Dx + Dx1))  # <-- new value
-    fctX_invar.setData(3 * T_load / 4, 1.0)
-    fctX_invar.setData(T_load, 1.0)
-    fctX_invar.setData(T, 1.0)
+    if use_dual_blade:
+        fctX_invar = PieceWiseLinearFunction()
+        fctX_invar.setData(0.0, 0.0)
+        fctX_invar.setData(T_load / 8, 0.0)
+        fctX_invar.setData(T_load / 2, Dx_invar / (Dx + Dx1))  # <-- new value
+        fctX_invar.setData(3 * T_load / 4, 1.0)
+        fctX_invar.setData(T_load, 1.0)
+        fctX_invar.setData(T, 1.0)
 
     fctY = PieceWiseLinearFunction()
     fctY.setData(0.0, 0.0)
@@ -993,12 +1104,13 @@ def getMetafor(d={}):
     domain.getLoadingSet().define(pa1, Field1D(TY, RE), Dy, fctY)
     domain.getLoadingSet().define(pa2, Field1D(TY, RE), Dy, fctY)
 
-    # domain.getLoadingSet().define(pa5, Field1D(TX, RE), (Dx + Dx1), fctX)
-    # domain.getLoadingSet().define(pa6, Field1D(TX, RE), (Dx + Dx1), fctX)
-    domain.getLoadingSet().define(pa5, Field1D(TX, RE), Dx_invar, fctX_invar)
-    domain.getLoadingSet().define(pa6, Field1D(TX, RE), Dx_invar, fctX_invar)
-    domain.getLoadingSet().define(pa3i, Field1D(TX, RE), Dx_invar, fctX_invar)
-    domain.getLoadingSet().define(pa4i, Field1D(TX, RE), Dx_invar, fctX_invar)
+
+    if use_dual_blade:
+        domain.getLoadingSet().define(pa5, Field1D(TX, RE), Dx_invar, fctX_invar)
+        domain.getLoadingSet().define(pa6, Field1D(TX, RE), Dx_invar, fctX_invar)
+        domain.getLoadingSet().define(pa3i, Field1D(TX, RE), Dx_invar, fctX_invar)
+        domain.getLoadingSet().define(pa4i, Field1D(TX, RE), Dx_invar, fctX_invar)
+
     domain.getLoadingSet().define(pa5, Field1D(TY, RE), Dy, fctY)
     domain.getLoadingSet().define(pa6, Field1D(TY, RE), Dy, fctY)
     domain.getLoadingSet().define(pa3i, Field1D(TY, RE), Dy, fctY)
@@ -1021,34 +1133,35 @@ def getMetafor(d={}):
     fctR2.setData(T_load, 1.0)
     fctR2.setData(T, 1.0)
 
-    # Rotation functions for Invar (same timing, but frozen axis movement)
+    # Rotation functions for inner (same timing, but frozen axis movement)
+    if use_dual_blade:
+        # Rotation (same as fctR)
+        fctR_invar = PieceWiseLinearFunction()
+        fctR_invar.setData(0.0, 0.0)
+        fctR_invar.setData(T_load / 10, 0.0)
+        fctR_invar.setData(T_load / 2, 1.0)
+        fctR_invar.setData(3 * T_load / 4, 1.0)
+        fctR_invar.setData(T_load, 1.0)
+        fctR_invar.setData(T, 1.0)
 
-    # Rotation (same as fctR)
-    fctR_invar = PieceWiseLinearFunction()
-    fctR_invar.setData(0.0, 0.0)
-    fctR_invar.setData(T_load / 10, 0.0)
-    fctR_invar.setData(T_load / 2, 1.0)
-    fctR_invar.setData(3 * T_load / 4, 1.0)
-    fctR_invar.setData(T_load, 1.0)
-    fctR_invar.setData(T, 1.0)
+        # Displacement of the inner rotation axis (fixed at 0.0)
+        fctR2_invar = PieceWiseLinearFunction()
+        fctR2_invar.setData(0.0, 0.0)
+        fctR2_invar.setData(T_load / 10, 0.0)
+        fctR2_invar.setData(T_load / 2, 0.0)
+        fctR2_invar.setData(3 * T_load / 4, 0.0)
+        fctR2_invar.setData(T_load, 1.0)  # 0.0 before
+        fctR2_invar.setData(T, 1.0)  # 0.0 before
 
-    # Displacement of the Invar rotation axis (fixed at 0.0)
-    fctR2_invar = PieceWiseLinearFunction()
-    fctR2_invar.setData(0.0, 0.0)
-    fctR2_invar.setData(T_load / 10, 0.0)
-    fctR2_invar.setData(T_load / 2, 0.0)
-    fctR2_invar.setData(3 * T_load / 4, 0.0)
-    fctR2_invar.setData(T_load, 1.0)  # 0.0 before
-    fctR2_invar.setData(T, 1.0)  # 0.0 before
-
-    # Apply rotation to Be-Cu blade
+    # Apply rotation to outer blade
     domain.getLoadingSet().defineRot2(c3, Field3D(TXTYTZ, RE), axe2, angleClamp, fctR2, axe1_BeCu, 180, fctR, False)
 
-    # Rotation applied to the Invar blade
-    domain.getLoadingSet().defineRot2(
-        c32, Field3D(TXTYTZ, RE),
-        axe2_Invar, angleClamp, fctR2_invar,
-        axe1_Invar, 180, fctR_invar, False)
+    if use_dual_blade:
+        # Rotation applied to the inner blade
+        domain.getLoadingSet().defineRot2(
+            c32, Field3D(TXTYTZ, RE),
+            axe2_Invar, angleClamp, fctR2_invar,
+            axe1_Invar, 180, fctR_invar, False)
 
     # OPTIMIZED THERMAL LOADING
     if sim_config.enable_thermal:
@@ -1489,106 +1602,107 @@ def getMetafor(d={}):
                         'mean_triaxiality_blade')
             extractor_id += 1
 
-            # === Plasticity extractors for inner blade (INVAR) ===
-            extractor_ids['max_plastic_strain_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_EPL), MaxOperator(),
-                        'max_plastic_strain_inner_blade')
-            extractor_id += 1
+            # === Plasticity extractors for inner blade  ===
+            if use_dual_blade:
+                extractor_ids['max_plastic_strain_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_EPL), MaxOperator(),
+                            'max_plastic_strain_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['mean_plastic_strain_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_EPL), MeanOperator(),
-                        'mean_plastic_strain_inner_blade')
-            extractor_id += 1
+                extractor_ids['mean_plastic_strain_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_EPL), MeanOperator(),
+                            'mean_plastic_strain_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['max_plastic_strain_rate_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_DEPL), MaxOperator(),
-                        'max_plastic_strain_rate_inner_blade')
-            extractor_id += 1
+                extractor_ids['max_plastic_strain_rate_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_DEPL), MaxOperator(),
+                            'max_plastic_strain_rate_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['mean_plastic_strain_rate_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_DEPL), MeanOperator(),
-                        'mean_plastic_strain_rate_inner_blade')
-            extractor_id += 1
+                extractor_ids['mean_plastic_strain_rate_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_DEPL), MeanOperator(),
+                            'mean_plastic_strain_rate_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['max_yield_function_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_CRITERION), MaxOperator(),
-                        'max_yield_function_inner_blade')
-            extractor_id += 1
+                extractor_ids['max_yield_function_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_CRITERION), MaxOperator(),
+                            'max_yield_function_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['mean_yield_function_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_CRITERION), MeanOperator(),
-                        'mean_yield_function_inner_blade')
-            extractor_id += 1
+                extractor_ids['mean_yield_function_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_CRITERION), MeanOperator(),
+                            'mean_yield_function_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['max_yield_stress_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_YIELD_STRESS), MaxOperator(),
-                        'max_yield_stress_inner_blade')
-            extractor_id += 1
+                extractor_ids['max_yield_stress_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_YIELD_STRESS), MaxOperator(),
+                            'max_yield_stress_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['mean_yield_stress_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_YIELD_STRESS), MeanOperator(),
-                        'mean_yield_stress_inner_blade')
-            extractor_id += 1
+                extractor_ids['mean_yield_stress_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_YIELD_STRESS), MeanOperator(),
+                            'mean_yield_stress_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['mean_VonMises_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_EVMS), MeanOperator(),
-                        'mean_VonMises_inner_blade')
-            extractor_id += 1
+                extractor_ids['mean_VonMises_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_EVMS), MeanOperator(),
+                            'mean_VonMises_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['max_stress_xx_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_SIG_XX), MaxOperator(),
-                        'max_stress_xx_inner_blade')
-            extractor_id += 1
+                extractor_ids['max_stress_xx_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_SIG_XX), MaxOperator(),
+                            'max_stress_xx_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['max_stress_yy_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_SIG_YY), MaxOperator(),
-                        'max_stress_yy_inner_blade')
-            extractor_id += 1
+                extractor_ids['max_stress_yy_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_SIG_YY), MaxOperator(),
+                            'max_stress_yy_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['max_stress_xy_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_SIG_XY), MaxOperator(),
-                        'max_stress_xy_inner_blade')
-            extractor_id += 1
+                extractor_ids['max_stress_xy_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_SIG_XY), MaxOperator(),
+                            'max_stress_xy_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['max_principal_stress_1_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_SIG_1), MaxOperator(),
-                        'max_principal_stress_1_inner_blade')
-            extractor_id += 1
+                extractor_ids['max_principal_stress_1_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_SIG_1), MaxOperator(),
+                            'max_principal_stress_1_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['max_principal_stress_2_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_SIG_2), MaxOperator(),
-                        'max_principal_stress_2_inner_blade')
-            extractor_id += 1
+                extractor_ids['max_principal_stress_2_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_SIG_2), MaxOperator(),
+                            'max_principal_stress_2_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['max_principal_stress_3_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_SIG_3), MaxOperator(),
-                        'max_principal_stress_3_inner_blade')
-            extractor_id += 1
+                extractor_ids['max_principal_stress_3_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_SIG_3), MaxOperator(),
+                            'max_principal_stress_3_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['max_pressure_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_P), MaxOperator(),
-                        'max_pressure_inner_blade')
-            extractor_id += 1
+                extractor_ids['max_pressure_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_P), MaxOperator(),
+                            'max_pressure_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['mean_pressure_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_P), MeanOperator(),
-                        'mean_pressure_inner_blade')
-            extractor_id += 1
+                extractor_ids['mean_pressure_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_P), MeanOperator(),
+                            'mean_pressure_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['max_triaxiality_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_TRIAX), MaxOperator(),
-                        'max_triaxiality_inner_blade')
-            extractor_id += 1
+                extractor_ids['max_triaxiality_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_TRIAX), MaxOperator(),
+                            'max_triaxiality_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['mean_triaxiality_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_TRIAX), MeanOperator(),
-                        'mean_triaxiality_inner_blade')
-            extractor_id += 1
+                extractor_ids['mean_triaxiality_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_TRIAX), MeanOperator(),
+                            'mean_triaxiality_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['Max_VonMises_inner'] = extractor_id
-            ext_becu = IFNodalValueExtractor(interactionset(7), IF_EVMS)
-            hcurves.add(extractor_id, ext_becu, MaxOperator(), 'Max_VonMises_inner')
-            extractor_id += 1
+                extractor_ids['Max_VonMises_inner'] = extractor_id
+                ext_becu = IFNodalValueExtractor(interactionset(7), IF_EVMS)
+                hcurves.add(extractor_id, ext_becu, MaxOperator(), 'Max_VonMises_inner')
+                extractor_id += 1
 
         # === Thermal extractors ===
         if sim_config.enable_thermal:
@@ -1616,16 +1730,17 @@ def getMetafor(d={}):
                         'thermal_strain_max_blade')
             extractor_id += 1
 
-            # --- Thermal strain inner blade ---
-            extractor_ids['thermal_strain_mean_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_THERMAL_STRAIN), MeanOperator(),
-                        'thermal_strain_mean_inner_blade')
-            extractor_id += 1
+            if use_dual_blade:
+                # --- Thermal strain inner blade ---
+                extractor_ids['thermal_strain_mean_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_THERMAL_STRAIN), MeanOperator(),
+                            'thermal_strain_mean_inner_blade')
+                extractor_id += 1
 
-            extractor_ids['thermal_strain_max_inner_blade'] = extractor_id
-            hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_THERMAL_STRAIN), MaxOperator(),
-                        'thermal_strain_max_inner_blade')
-            extractor_id += 1
+                extractor_ids['thermal_strain_max_inner_blade'] = extractor_id
+                hcurves.add(extractor_id, IFNodalValueExtractor(interactionset(7), IF_THERMAL_STRAIN), MaxOperator(),
+                            'thermal_strain_max_inner_blade')
+                extractor_id += 1
 
             # --- Thermal-induced displacements ---
             extractor_ids['thermal_dispX_mass_top_right'] = extractor_id
@@ -1653,15 +1768,16 @@ def getMetafor(d={}):
                         'dispY_outer_blade_tip')
             extractor_id += 1
 
-            extractor_ids['dispX_inner_blade_tip'] = extractor_id
-            hcurves.add(extractor_id, DbNodalValueExtractor(p33, Field1D(TX, RE)), SumOperator(),
-                        'dispX_inner_blade_tip')
-            extractor_id += 1
+            if use_dual_blade:
+                extractor_ids['dispX_inner_blade_tip'] = extractor_id
+                hcurves.add(extractor_id, DbNodalValueExtractor(p33, Field1D(TX, RE)), SumOperator(),
+                            'dispX_inner_blade_tip')
+                extractor_id += 1
 
-            extractor_ids['dispY_inner_blade_tip'] = extractor_id
-            hcurves.add(extractor_id, DbNodalValueExtractor(p33, Field1D(TY, RE)), SumOperator(),
-                        'dispY_inner_blade_tip')
-            extractor_id += 1
+                extractor_ids['dispY_inner_blade_tip'] = extractor_id
+                hcurves.add(extractor_id, DbNodalValueExtractor(p33, Field1D(TY, RE)), SumOperator(),
+                            'dispY_inner_blade_tip')
+                extractor_id += 1
 
         # === Final check ===
         final_extractor_count = extractor_id - 1
@@ -1726,26 +1842,27 @@ def getMetafor(d={}):
                 metafor.addObserver(win2)
 
                 # --- Plot 2b: Plastic strain evolution (inner blade) ---
-                plot2b = DataCurveSet()
-                plot2b.add(VectorDataCurve(1,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['max_plastic_strain_inner_blade']),
-                                           'Max Plastic Strain - Inner Blade'))
-                plot2b.add(VectorDataCurve(2,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['mean_plastic_strain_inner_blade']),
-                                           'Mean Plastic Strain - Inner Blade'))
-                plot2b.add(VectorDataCurve(3,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['max_plastic_strain_rate_inner_blade']),
-                                           'Max Plastic Strain Rate - Inner Blade'))
+                if use_dual_blade:
+                    plot2b = DataCurveSet()
+                    plot2b.add(VectorDataCurve(1,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['max_plastic_strain_inner_blade']),
+                                               'Max Plastic Strain - Inner Blade'))
+                    plot2b.add(VectorDataCurve(2,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['mean_plastic_strain_inner_blade']),
+                                               'Mean Plastic Strain - Inner Blade'))
+                    plot2b.add(VectorDataCurve(3,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['max_plastic_strain_rate_inner_blade']),
+                                               'Max Plastic Strain Rate - Inner Blade'))
 
-                win2b = VizWin()
-                win2b.add(plot2b)
-                win2b.setPlotTitle("Plastic Strain Evolution Inner Blade- Material Nonlinearity")
-                win2b.setPlotXLabel("Time [s]")
-                win2b.setPlotYLabel("Plastic Strain [-]")
-                metafor.addObserver(win2b)
+                    win2b = VizWin()
+                    win2b.add(plot2b)
+                    win2b.setPlotTitle("Plastic Strain Evolution Inner Blade- Material Nonlinearity")
+                    win2b.setPlotXLabel("Time [s]")
+                    win2b.setPlotYLabel("Plastic Strain [-]")
+                    metafor.addObserver(win2b)
 
                 # --- Plot 3: Stress vs Yield comparison (outer blade)---
                 plot3 = DataCurveSet()
@@ -1781,39 +1898,40 @@ def getMetafor(d={}):
                 win3.setPlotYLabel("Stress [MPa]")
                 metafor.addObserver(win3)
 
-                # --- Plot 3b: Stress vs Yield comparison (inner blade)---
-                plot3b = DataCurveSet()
-                plot3b.add(VectorDataCurve(1,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['Max_VonMises_inner']),
-                                           'Max Von Mises'))
-                plot3b.add(VectorDataCurve(2,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['mean_VonMises_inner_blade']),
-                                           'Mean Von Mises'))
-                plot3b.add(VectorDataCurve(3,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['mean_yield_stress_inner_blade']),
-                                           'Mean Yield Stress'))
-                plot3b.add(VectorDataCurve(4,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['mean_yield_function_inner_blade']),
-                                           'Mean Yield Function - Inner Blade'))
+                if use_dual_blade:
+                    # --- Plot 3b: Stress vs Yield comparison (inner blade)---
+                    plot3b = DataCurveSet()
+                    plot3b.add(VectorDataCurve(1,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['Max_VonMises_inner']),
+                                               'Max Von Mises'))
+                    plot3b.add(VectorDataCurve(2,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['mean_VonMises_inner_blade']),
+                                               'Mean Von Mises'))
+                    plot3b.add(VectorDataCurve(3,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['mean_yield_stress_inner_blade']),
+                                               'Mean Yield Stress'))
+                    plot3b.add(VectorDataCurve(4,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['mean_yield_function_inner_blade']),
+                                               'Mean Yield Function - Inner Blade'))
 
-                if blade_config.inner_material == 'INVAR':
-                    elastic_limit = 250.0  # MPa
-                elif blade_config.material == 'INVAR_CW_HARD':
-                    elastic_limit = 650.0  # MPa
-                elif blade_config.inner_material == 'BE_CU':
-                    elastic_limit = 1000.0  # MPa
+                    if blade_config.inner_material == 'INVAR':
+                        elastic_limit = 250.0  # MPa
+                    elif blade_config.material == 'INVAR_CW_HARD':
+                        elastic_limit = 650.0  # MPa
+                    elif blade_config.inner_material == 'BE_CU':
+                        elastic_limit = 1000.0  # MPa
 
-                win3b = VizWin()
-                win3b.add(plot3b)
-                win3b.setPlotTitle(
-                    f"Stress Evolution vs Yield (Inner {blade_config.inner_material} blade- Initial Elastic Limit: {elastic_limit} MPa)")
-                win3b.setPlotXLabel("Time [s]")
-                win3b.setPlotYLabel("Stress [MPa]")
-                metafor.addObserver(win3b)
+                    win3b = VizWin()
+                    win3b.add(plot3b)
+                    win3b.setPlotTitle(
+                        f"Stress Evolution vs Yield (Inner {blade_config.inner_material} blade- Initial Elastic Limit: {elastic_limit} MPa)")
+                    win3b.setPlotXLabel("Time [s]")
+                    win3b.setPlotYLabel("Stress [MPa]")
+                    metafor.addObserver(win3b)
 
                 # --- Plot 4: Stress components evolution ---
                 plot4 = DataCurveSet()
@@ -1841,31 +1959,33 @@ def getMetafor(d={}):
                 win4.setPlotYLabel("Stress [MPa]")
                 metafor.addObserver(win4)
 
-                # --- Plot 4b: Stress components evolution (inner blade) ---
-                plot4b = DataCurveSet()
-                plot4b.add(VectorDataCurve(1,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['max_stress_xx_inner_blade']),
-                                           'Max σ_xx - Inner Blade'))
-                plot4b.add(VectorDataCurve(2,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['max_stress_yy_inner_blade']),
-                                           'Max σ_yy - Inner Blade'))
-                plot4b.add(VectorDataCurve(3,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['max_stress_xy_inner_blade']),
-                                           'Max σ_xy - Inner Blade'))
-                plot4b.add(VectorDataCurve(4,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['max_principal_stress_1_inner_blade']),
-                                           'Max σ_1 (Principal) - Inner Blade'))
+                if use_dual_blade:
+                    # --- Plot 4b: Stress components evolution (inner blade) ---
 
-                win4b = VizWin()
-                win4b.add(plot4b)
-                win4b.setPlotTitle("Stress Components Evolution - Inner Blade")
-                win4b.setPlotXLabel("Time [s]")
-                win4b.setPlotYLabel("Stress [MPa]")
-                metafor.addObserver(win4b)
+                    plot4b = DataCurveSet()
+                    plot4b.add(VectorDataCurve(1,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['max_stress_xx_inner_blade']),
+                                               'Max σ_xx - Inner Blade'))
+                    plot4b.add(VectorDataCurve(2,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['max_stress_yy_inner_blade']),
+                                               'Max σ_yy - Inner Blade'))
+                    plot4b.add(VectorDataCurve(3,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['max_stress_xy_inner_blade']),
+                                               'Max σ_xy - Inner Blade'))
+                    plot4b.add(VectorDataCurve(4,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['max_principal_stress_1_inner_blade']),
+                                               'Max σ_1 (Principal) - Inner Blade'))
+
+                    win4b = VizWin()
+                    win4b.add(plot4b)
+                    win4b.setPlotTitle("Stress Components Evolution - Inner Blade")
+                    win4b.setPlotXLabel("Time [s]")
+                    win4b.setPlotYLabel("Stress [MPa]")
+                    metafor.addObserver(win4b)
 
                 # --- Plot 5: Pressure evolution ---
                 plot5 = DataCurveSet()
@@ -1885,23 +2005,24 @@ def getMetafor(d={}):
                 win5.setPlotYLabel("Pressure [MPa]")
                 metafor.addObserver(win5)
 
-                # --- Plot 5b: Pressure evolution (inner blade) ---
-                plot5b = DataCurveSet()
-                plot5b.add(VectorDataCurve(1,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['max_pressure_inner_blade']),
-                                           'Max Pressure - Inner Blade'))
-                plot5b.add(VectorDataCurve(2,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['mean_pressure_inner_blade']),
-                                           'Mean Pressure - Inner Blade'))
+                if use_dual_blade:
+                    # --- Plot 5b: Pressure evolution (inner blade) ---
+                    plot5b = DataCurveSet()
+                    plot5b.add(VectorDataCurve(1,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['max_pressure_inner_blade']),
+                                               'Max Pressure - Inner Blade'))
+                    plot5b.add(VectorDataCurve(2,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['mean_pressure_inner_blade']),
+                                               'Mean Pressure - Inner Blade'))
 
-                win5b = VizWin()
-                win5b.add(plot5b)
-                win5b.setPlotTitle("Pressure Evolution - Inner Blade")
-                win5b.setPlotXLabel("Time [s]")
-                win5b.setPlotYLabel("Pressure [MPa]")
-                metafor.addObserver(win5b)
+                    win5b = VizWin()
+                    win5b.add(plot5b)
+                    win5b.setPlotTitle("Pressure Evolution - Inner Blade")
+                    win5b.setPlotXLabel("Time [s]")
+                    win5b.setPlotYLabel("Pressure [MPa]")
+                    metafor.addObserver(win5b)
 
                 # --- Plot 6: Triaxiality evolution ---
                 plot6 = DataCurveSet()
@@ -1921,23 +2042,24 @@ def getMetafor(d={}):
                 win6.setPlotYLabel("Triaxiality [-]")
                 metafor.addObserver(win6)
 
-                # --- Plot 6b: Triaxiality evolution (inner blade) ---
-                plot6b = DataCurveSet()
-                plot6b.add(VectorDataCurve(1,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['max_triaxiality_inner_blade']),
-                                           'Max Triaxiality - Inner Blade'))
-                plot6b.add(VectorDataCurve(2,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['mean_triaxiality_inner_blade']),
-                                           'Mean Triaxiality - Inner Blade'))
+                if use_dual_blade:
+                    # --- Plot 6b: Triaxiality evolution (inner blade) ---
+                    plot6b = DataCurveSet()
+                    plot6b.add(VectorDataCurve(1,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['max_triaxiality_inner_blade']),
+                                               'Max Triaxiality - Inner Blade'))
+                    plot6b.add(VectorDataCurve(2,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['mean_triaxiality_inner_blade']),
+                                               'Mean Triaxiality - Inner Blade'))
 
-                win6b = VizWin()
-                win6b.add(plot6b)
-                win6b.setPlotTitle("Triaxiality Evolution - Inner Blade")
-                win6b.setPlotXLabel("Time [s]")
-                win6b.setPlotYLabel("Triaxiality [-]")
-                metafor.addObserver(win6b)
+                    win6b = VizWin()
+                    win6b.add(plot6b)
+                    win6b.setPlotTitle("Triaxiality Evolution - Inner Blade")
+                    win6b.setPlotXLabel("Time [s]")
+                    win6b.setPlotYLabel("Triaxiality [-]")
+                    metafor.addObserver(win6b)
 
                 # --- Plot 7: Plasticity onset detection ---
                 plot7 = DataCurveSet()
@@ -1961,27 +2083,28 @@ def getMetafor(d={}):
                 win7.setPlotYLabel("Criterion Value / Plastic Strain Rate [-]")
                 metafor.addObserver(win7)
 
-                # --- Plot 7b: Plasticity onset monitoring (inner blade) ---
-                plot7b = DataCurveSet()
-                plot7b.add(VectorDataCurve(1,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['max_yield_function_inner_blade']),
-                                           'Max Yield Function - Inner Blade'))
-                plot7b.add(VectorDataCurve(2,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['mean_yield_function_inner_blade']),
-                                           'Mean Yield Function - Inner Blade'))
-                plot7b.add(VectorDataCurve(3,
-                                           hcurves.getDataVector(extractor_ids['time']),
-                                           hcurves.getDataVector(extractor_ids['mean_plastic_strain_rate_inner_blade']),
-                                           'Mean Plastic Strain Rate - Inner Blade'))
+                if use_dual_blade:
+                    # --- Plot 7b: Plasticity onset monitoring (inner blade) ---
+                    plot7b = DataCurveSet()
+                    plot7b.add(VectorDataCurve(1,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['max_yield_function_inner_blade']),
+                                               'Max Yield Function - Inner Blade'))
+                    plot7b.add(VectorDataCurve(2,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['mean_yield_function_inner_blade']),
+                                               'Mean Yield Function - Inner Blade'))
+                    plot7b.add(VectorDataCurve(3,
+                                               hcurves.getDataVector(extractor_ids['time']),
+                                               hcurves.getDataVector(extractor_ids['mean_plastic_strain_rate_inner_blade']),
+                                               'Mean Plastic Strain Rate - Inner Blade'))
 
-                win7b = VizWin()
-                win7b.add(plot7b)
-                win7b.setPlotTitle("Plasticity Onset Monitoring - Criterion Function - Inner Blade")
-                win7b.setPlotXLabel("Time [s]")
-                win7b.setPlotYLabel("Criterion Value / Plastic Strain Rate [-]")
-                metafor.addObserver(win7b)
+                    win7b = VizWin()
+                    win7b.add(plot7b)
+                    win7b.setPlotTitle("Plasticity Onset Monitoring - Criterion Function - Inner Blade")
+                    win7b.setPlotXLabel("Time [s]")
+                    win7b.setPlotYLabel("Criterion Value / Plastic Strain Rate [-]")
+                    metafor.addObserver(win7b)
 
                 # === Thermal-related plots ===
             if sim_config.enable_thermal:
@@ -2051,23 +2174,24 @@ def getMetafor(d={}):
                 win10.setPlotYLabel("Thermal Strain [-]")
                 metafor.addObserver(win10)
 
-                # --- Plot 10b: Thermal strain evolution (inner blade) ---
-                plot10b = DataCurveSet()
-                plot10b.add(VectorDataCurve(1,
-                                            hcurves.getDataVector(extractor_ids['time']),
-                                            hcurves.getDataVector(extractor_ids['thermal_strain_mean_inner_blade']),
-                                            'Mean Thermal Strain - Inner Blade'))
-                plot10b.add(VectorDataCurve(2,
-                                            hcurves.getDataVector(extractor_ids['time']),
-                                            hcurves.getDataVector(extractor_ids['thermal_strain_max_inner_blade']),
-                                            'Max Thermal Strain - Inner Blade'))
+                if use_dual_blade:
+                    # --- Plot 10b: Thermal strain evolution (inner blade) ---
+                    plot10b = DataCurveSet()
+                    plot10b.add(VectorDataCurve(1,
+                                                hcurves.getDataVector(extractor_ids['time']),
+                                                hcurves.getDataVector(extractor_ids['thermal_strain_mean_inner_blade']),
+                                                'Mean Thermal Strain - Inner Blade'))
+                    plot10b.add(VectorDataCurve(2,
+                                                hcurves.getDataVector(extractor_ids['time']),
+                                                hcurves.getDataVector(extractor_ids['thermal_strain_max_inner_blade']),
+                                                'Max Thermal Strain - Inner Blade'))
 
-                win10b = VizWin()
-                win10b.add(plot10b)
-                win10b.setPlotTitle("Thermal Strain Evolution - Inner Blade Material Response")
-                win10b.setPlotXLabel("Time [s]")
-                win10b.setPlotYLabel("Thermal Strain [-]")
-                metafor.addObserver(win10b)
+                    win10b = VizWin()
+                    win10b.add(plot10b)
+                    win10b.setPlotTitle("Thermal Strain Evolution - Inner Blade Material Response")
+                    win10b.setPlotXLabel("Time [s]")
+                    win10b.setPlotYLabel("Thermal Strain [-]")
+                    metafor.addObserver(win10b)
 
                 # --- Plot 11: Rod end Y displacement vs temperature ---
                 plot11 = DataCurveSet()
@@ -2102,23 +2226,24 @@ def getMetafor(d={}):
                     win12.setPlotYLabel("Plastic Strain [-] / Von Mises [MPa]")
                     metafor.addObserver(win12)
 
-                    # --- Plot 12b: Thermomechanical coupling - Inner Blade ---
-                    plot12b = DataCurveSet()
-                    plot12b.add(VectorDataCurve(1,
-                                                hcurves.getDataVector(extractor_ids['temp_mean_blade_K']),
-                                                hcurves.getDataVector(extractor_ids['max_plastic_strain_inner_blade']),
-                                                'Max Plastic Strain vs Temperature - Inner Blade'))
-                    plot12b.add(VectorDataCurve(2,
-                                                hcurves.getDataVector(extractor_ids['temp_mean_blade_K']),
-                                                hcurves.getDataVector(extractor_ids['Max_VonMises_inner']),
-                                                'Von Mises vs Temperature - Inner Blade'))
+                    if use_dual_blade:
+                        # --- Plot 12b: Thermomechanical coupling - Inner Blade ---
+                        plot12b = DataCurveSet()
+                        plot12b.add(VectorDataCurve(1,
+                                                    hcurves.getDataVector(extractor_ids['temp_mean_blade_K']),
+                                                    hcurves.getDataVector(extractor_ids['max_plastic_strain_inner_blade']),
+                                                    'Max Plastic Strain vs Temperature - Inner Blade'))
+                        plot12b.add(VectorDataCurve(2,
+                                                    hcurves.getDataVector(extractor_ids['temp_mean_blade_K']),
+                                                    hcurves.getDataVector(extractor_ids['Max_VonMises_inner']),
+                                                    'Von Mises vs Temperature - Inner Blade'))
 
-                    win12b = VizWin()
-                    win12b.add(plot12b)
-                    win12b.setPlotTitle("Thermomechanical Coupling - Inner Blade Temperature Effects on Plasticity")
-                    win12b.setPlotXLabel("Mean Temperature [K]")
-                    win12b.setPlotYLabel("Plastic Strain [-] / Von Mises [MPa]")
-                    metafor.addObserver(win12b)
+                        win12b = VizWin()
+                        win12b.add(plot12b)
+                        win12b.setPlotTitle("Thermomechanical Coupling - Inner Blade Temperature Effects on Plasticity")
+                        win12b.setPlotXLabel("Mean Temperature [K]")
+                        win12b.setPlotYLabel("Plastic Strain [-] / Von Mises [MPa]")
+                        metafor.addObserver(win12b)
 
                 # --- Plot 13: Blade tip displacement vs time ---
                 plot13 = DataCurveSet()
@@ -2138,23 +2263,24 @@ def getMetafor(d={}):
                 win13.setPlotYLabel("Displacement [mm]")
                 metafor.addObserver(win13)
 
-                # --- Plot 13b: Inner Blade tip displacement vs time ---
-                plot13b = DataCurveSet()
-                plot13b.add(VectorDataCurve(1,
-                                            hcurves.getDataVector(extractor_ids['time']),
-                                            hcurves.getDataVector(extractor_ids['dispX_inner_blade_tip']),
-                                            'Inner Blade Tip Disp X'))
-                plot13b.add(VectorDataCurve(2,
-                                            hcurves.getDataVector(extractor_ids['time']),
-                                            hcurves.getDataVector(extractor_ids['dispY_inner_blade_tip']),
-                                            'Inner Blade Tip Disp Y'))
+                if use_dual_blade:
+                    # --- Plot 13b: Inner Blade tip displacement vs time ---
+                    plot13b = DataCurveSet()
+                    plot13b.add(VectorDataCurve(1,
+                                                hcurves.getDataVector(extractor_ids['time']),
+                                                hcurves.getDataVector(extractor_ids['dispX_inner_blade_tip']),
+                                                'Inner Blade Tip Disp X'))
+                    plot13b.add(VectorDataCurve(2,
+                                                hcurves.getDataVector(extractor_ids['time']),
+                                                hcurves.getDataVector(extractor_ids['dispY_inner_blade_tip']),
+                                                'Inner Blade Tip Disp Y'))
 
-                win13b = VizWin()
-                win13b.add(plot13b)
-                win13b.setPlotTitle("Inner Blade Tip Displacement Evolution")
-                win13b.setPlotXLabel("Time [s]")
-                win13b.setPlotYLabel("Displacement [mm]")
-                metafor.addObserver(win13b)
+                    win13b = VizWin()
+                    win13b.add(plot13b)
+                    win13b.setPlotTitle("Inner Blade Tip Displacement Evolution")
+                    win13b.setPlotXLabel("Time [s]")
+                    win13b.setPlotYLabel("Displacement [mm]")
+                    metafor.addObserver(win13b)
 
         except NameError:
             print("Warning: Visualization not available")
@@ -2943,210 +3069,211 @@ def additional_diagnostics(blade_config):
 
 
 #============================= SECOND Plasticity analysis ============================
-    print('\n=== PLASTICITY ANALYSIS - INNER BLADE ===')
+    if USE_DUAL_BLADE:
+        print('\n=== PLASTICITY ANALYSIS - INNER BLADE ===')
 
-    # Define material properties for reference
-    material_properties_inner = {
-        'BE_CU': {'elastic_limit': 1000.0, 'hardening': 1000.0},
-        'INVAR': {'elastic_limit': 250.0, 'hardening': 600.0},
-        'INVAR_CW_HARD': {'elastic_limit': 650.0, 'hardening': 700.0}
-    }
+        # Define material properties for reference
+        material_properties_inner = {
+            'BE_CU': {'elastic_limit': 1000.0, 'hardening': 1000.0},
+            'INVAR': {'elastic_limit': 250.0, 'hardening': 600.0},
+            'INVAR_CW_HARD': {'elastic_limit': 650.0, 'hardening': 700.0}
+        }
 
-    # Determine current material (you'll need to pass this or detect it)
-    inner_material = blade_config.inner_material  # Change this based on your blade_config.inner_material
-    elastic_limit_inner = material_properties_inner[inner_material]['elastic_limit']
+        # Use Invar properties for the inner blade
+        inner_material = 'INVAR'
+        elastic_limit_inner = material_properties_inner[inner_material]['elastic_limit']
 
-    print(f"Material (Inner Blade): {inner_material}")
-    print(f"Elastic limit: {elastic_limit_inner} MPa")
+        print(f"Material (Inner Blade): {inner_material}")
+        print(f"Elastic limit: {elastic_limit_inner} MPa")
 
-    # Plasticity files to analyze (INNER)
-    plasticity_files_inner = {
-        'Max Von Mises Stress': 'Max_VonMises_inner.ascii',
-        'Max Plastic Strain': 'max_plastic_strain_inner_blade.ascii',
-        'Mean Plastic Strain': 'mean_plastic_strain_rate_inner_blade.ascii',
-        'Max Plastic Strain Rate': 'max_plastic_strain_rate_inner_blade.ascii',
-        'Max Yield Function': 'max_yield_function_inner_blade.ascii',
-        'Max Yield Stress': 'max_yield_stress_inner_blade.ascii',
-        'Max Triaxiality': 'max_triaxiality_inner_blade.ascii',
-        'Max Principal Stress 1': 'max_principal_stress_1_inner_blade.ascii',
-        'Max Principal Stress 2': 'max_principal_stress_2_inner_blade.ascii',
-        'Max Principal Stress 3': 'max_principal_stress_3_inner_blade.ascii',
-        'Max Pressure': 'max_pressure_inner_blade.ascii'
-    }
+        # Plasticity files to analyze (INNER)
+        plasticity_files_inner = {
+            'Max Von Mises Stress': 'Max_VonMises_inner.ascii',
+            'Max Plastic Strain': 'max_plastic_strain_inner_blade.ascii',
+            'Mean Plastic Strain': 'mean_plastic_strain_rate_inner_blade.ascii',
+            'Max Plastic Strain Rate': 'max_plastic_strain_rate_inner_blade.ascii',
+            'Max Yield Function': 'max_yield_function_inner_blade.ascii',
+            'Max Yield Stress': 'max_yield_stress_inner_blade.ascii',
+            'Max Triaxiality': 'max_triaxiality_inner_blade.ascii',
+            'Max Principal Stress 1': 'max_principal_stress_1_inner_blade.ascii',
+            'Max Principal Stress 2': 'max_principal_stress_2_inner_blade.ascii',
+            'Max Principal Stress 3': 'max_principal_stress_3_inner_blade.ascii',
+            'Max Pressure': 'max_pressure_inner_blade.ascii'
+        }
 
-    print('\n--- PLASTICITY STATE ANALYSIS (Inner Blade) ---')
-    plasticity_data_inner = {}
+        print('\n--- PLASTICITY STATE ANALYSIS (Inner Blade) ---')
+        plasticity_data_inner = {}
 
-    for param_name, filename in plasticity_files_inner.items():
-        if os.path.exists(filename):
+        for param_name, filename in plasticity_files_inner.items():
+            if os.path.exists(filename):
+                try:
+                    with open(filename, 'r') as f:
+                        values = [float(line.strip()) for line in f if line.strip()]
+
+                    if values:
+                        initial_val = values[0]
+                        final_val = values[-1]
+                        max_val = max(values)
+                        min_val = min(values)
+
+                        plasticity_data_inner[param_name] = {
+                            'initial': initial_val,
+                            'final': final_val,
+                            'maximum': max_val,
+                            'minimum': min_val,
+                            'evolution': final_val - initial_val
+                        }
+
+                        print(f"{param_name}:")
+                        if 'Stress' in param_name or 'Pressure' in param_name:
+                            print(f"  Initial: {initial_val:.2f} MPa")
+                            print(f"  Final: {final_val:.2f} MPa")
+                            print(f"  Maximum: {max_val:.2f} MPa")
+                            print(f"  Evolution: {final_val - initial_val:.2f} MPa")
+                        elif 'Strain' in param_name:
+                            print(f"  Initial: {initial_val:.2e}")
+                            print(f"  Final: {final_val:.2e}")
+                            print(f"  Maximum: {max_val:.2e}")
+                            print(f"  Evolution: {final_val - initial_val:.2e}")
+                        else:
+                            print(f"  Initial: {initial_val:.6f}")
+                            print(f"  Final: {final_val:.6f}")
+                            print(f"  Maximum: {max_val:.6f}")
+                            print(f"  Evolution: {final_val - initial_val:.6f}")
+
+                except Exception as e:
+                    print(f"Could not read {filename}: {e}")
+            else:
+                print(f"{param_name}: File not found ({filename})")
+
+        # Plasticity assessment
+        print('\n--- PLASTICITY ASSESSMENT (Inner Blade) ---')
+
+        if 'Max Von Mises Stress' in plasticity_data_inner:
+            max_stress = plasticity_data_inner['Max Von Mises Stress']['maximum']
+            final_stress = plasticity_data_inner['Max Von Mises Stress']['final']
+
+            print(f"Maximum Von Mises stress reached: {max_stress:.2f} MPa")
+            print(f"Final Von Mises stress: {final_stress:.2f} MPa")
+            print(f"Elastic limit: {elastic_limit_inner:.2f} MPa")
+
+            if max_stress > elastic_limit_inner:
+                overstress = max_stress - elastic_limit_inner
+                overstress_percent = (overstress / elastic_limit_inner) * 100
+                print(f"*** PLASTICITY DETECTED ***")
+                print(f"Overstress: {overstress:.2f} MPa ({overstress_percent:.1f}% above elastic limit)")
+            else:
+                safety_factor = elastic_limit_inner / max_stress
+                print(f"*** ELASTIC BEHAVIOR ***")
+                print(f"Safety factor: {safety_factor:.2f}")
+
+        if 'Max Plastic Strain' in plasticity_data_inner:
+            max_plastic_strain = plasticity_data_inner['Max Plastic Strain']['maximum']
+            final_plastic_strain = plasticity_data_inner['Max Plastic Strain']['final']
+
+            if max_plastic_strain > 1e-8:
+                print(f"*** PLASTIC DEFORMATION CONFIRMED ***")
+                print(f"Maximum plastic strain: {max_plastic_strain:.2e}")
+                print(f"Final plastic strain: {final_plastic_strain:.2e}")
+
+                if max_plastic_strain > 1e-6:
+                    print(f"*** SIGNIFICANT PLASTIC DEFORMATION ***")
+                    print(f"This level of plastic strain may cause permanent changes")
+                    print(f"to the sensor's mechanical properties and calibration")
+            else:
+                print(f"No significant plastic strain detected")
+
+        if 'Max Yield Function' in plasticity_data_inner:
+            max_yield_function = plasticity_data_inner['Max Yield Function']['maximum']
+            final_yield_function = plasticity_data_inner['Max Yield Function']['final']
+
+            print(f"Maximum yield function value: {max_yield_function:.6f}")
+            print(f"Final yield function value: {final_yield_function:.6f}")
+
+            if max_yield_function > 1e-6:
+                print(f"*** YIELD FUNCTION ACTIVE (f > 0) ***")
+                print(f"Material is actively yielding during simulation")
+            else:
+                print(f"Yield function remains inactive (f </= 0)")
+
+        # Stress state analysis
+        if all(key in plasticity_data_inner for key in
+               ['Max Principal Stress 1', 'Max Principal Stress 2', 'Max Principal Stress 3']):
+            print('\n--- STRESS STATE ANALYSIS (Inner Blade) ---')
+            sig1_max = plasticity_data_inner['Max Principal Stress 1']['maximum']
+            sig2_max = plasticity_data_inner['Max Principal Stress 2']['maximum']
+            sig3_max = plasticity_data_inner['Max Principal Stress 3']['maximum']
+
+            print(f"Maximum principal stresses:")
+            print(f"  Sigma1 = {sig1_max:.2f} MPa")
+            print(f"  Sigma2 = {sig2_max:.2f} MPa")
+            print(f"  Sigma3 = {sig3_max:.2f} MPa")
+
+            if abs(sig2_max) < 0.1 * abs(sig1_max) and abs(sig3_max) < 0.1 * abs(sig1_max):
+                print("Stress state: Predominantly uniaxial")
+            elif abs(sig3_max) < 0.1 * max(abs(sig1_max), abs(sig2_max)):
+                print("Stress state: Predominantly plane stress")
+            else:
+                print("Stress state: Triaxial")
+
+        if 'Max Triaxiality' in plasticity_data_inner:
+            max_triax = plasticity_data_inner['Max Triaxiality']['maximum']
+            print(f"Maximum stress triaxiality: {max_triax:.3f}")
+
+            if max_triax > 0.33:
+                print("High triaxiality - potential for void growth")
+            elif max_triax < -0.33:
+                print("Compressive triaxiality - shear-dominated deformation")
+            else:
+                print("Moderate triaxiality - balanced stress state")
+
+        # Correlation with temperature
+        print('\n--- PLASTICITY-TEMPERATURE CORRELATION (Inner Blade) ---')
+
+        if time_values and 'Max Von Mises Stress' in plasticity_data_inner:
             try:
-                with open(filename, 'r') as f:
-                    values = [float(line.strip()) for line in f if line.strip()]
+                with open('Max_VonMises_inner.ascii', 'r') as f:
+                    stress_values = [float(line.strip()) for line in f if line.strip()]
 
-                if values:
-                    initial_val = values[0]
-                    final_val = values[-1]
-                    max_val = max(values)
-                    min_val = min(values)
+                if len(stress_values) == len(time_values):
+                    plastic_start_indices = [i for i, stress in enumerate(stress_values) if stress > elastic_limit_inner]
 
-                    plasticity_data_inner[param_name] = {
-                        'initial': initial_val,
-                        'final': final_val,
-                        'maximum': max_val,
-                        'minimum': min_val,
-                        'evolution': final_val - initial_val
-                    }
+                    if plastic_start_indices:
+                        plastic_start_time = time_values[plastic_start_indices[0]]
+                        plastic_start_stress = stress_values[plastic_start_indices[0]]
 
-                    print(f"{param_name}:")
-                    if 'Stress' in param_name or 'Pressure' in param_name:
-                        print(f"  Initial: {initial_val:.2f} MPa")
-                        print(f"  Final: {final_val:.2f} MPa")
-                        print(f"  Maximum: {max_val:.2f} MPa")
-                        print(f"  Evolution: {final_val - initial_val:.2f} MPa")
-                    elif 'Strain' in param_name:
-                        print(f"  Initial: {initial_val:.2e}")
-                        print(f"  Final: {final_val:.2e}")
-                        print(f"  Maximum: {max_val:.2e}")
-                        print(f"  Evolution: {final_val - initial_val:.2e}")
+                        print(f"Plasticity initiated at:")
+                        print(f"  Time: {plastic_start_time:.2f} s")
+                        print(f"  Stress: {plastic_start_stress:.2f} MPa")
+
+                        if os.path.exists('temp_mean_blade_K.ascii'):
+                            with open('temp_mean_blade_K.ascii', 'r') as f:
+                                temp_values = [float(line.strip()) for line in f if line.strip()]
+
+                            if len(temp_values) == len(time_values):
+                                delta_T = temp_values[plastic_start_indices[0]]
+                                plastic_start_temp_C = delta_T - 273.15
+                                print(f"  Temperature at plasticity onset: {plastic_start_temp_C:.1f}°C")
+                                print(f"  Temperature rise from start: {plastic_start_temp_C - 10:.1f}°C")
                     else:
-                        print(f"  Initial: {initial_val:.6f}")
-                        print(f"  Final: {final_val:.6f}")
-                        print(f"  Maximum: {max_val:.6f}")
-                        print(f"  Evolution: {final_val - initial_val:.6f}")
+                        print("No plasticity detected based on stress threshold")
 
             except Exception as e:
-                print(f"Could not read {filename}: {e}")
+                print(f"Could not correlate plasticity with temperature: {e}")
+
+        # Plasticity impact summary
+        print('\n--- PLASTICITY IMPACT ON SENSOR (Inner Blade) ---')
+        if 'Max Plastic Strain' in plasticity_data_inner and plasticity_data_inner['Max Plastic Strain']['maximum'] > 1e-6:
+            print("*** WARNING: SIGNIFICANT PLASTICITY DETECTED ***")
+            print("Potential impacts on sensor performance:")
+            print(" Permanent deformation may alter resonant frequencies")
+            print(" Stress relaxation could affect long-term stability")
+            print(" Calibration may drift due to permanent material changes")
+            print(" Consider reducing temperature range or stress levels")
+            print(" Material substitution (higher yield strength) may be needed")
         else:
-            print(f"{param_name}: File not found ({filename})")
-
-    # Plasticity assessment
-    print('\n--- PLASTICITY ASSESSMENT (Inner Blade) ---')
-
-    if 'Max Von Mises Stress' in plasticity_data_inner:
-        max_stress = plasticity_data_inner['Max Von Mises Stress']['maximum']
-        final_stress = plasticity_data_inner['Max Von Mises Stress']['final']
-
-        print(f"Maximum Von Mises stress reached: {max_stress:.2f} MPa")
-        print(f"Final Von Mises stress: {final_stress:.2f} MPa")
-        print(f"Elastic limit: {elastic_limit_inner:.2f} MPa")
-
-        if max_stress > elastic_limit_inner:
-            overstress = max_stress - elastic_limit_inner
-            overstress_percent = (overstress / elastic_limit_inner) * 100
-            print(f"*** PLASTICITY DETECTED ***")
-            print(f"Overstress: {overstress:.2f} MPa ({overstress_percent:.1f}% above elastic limit)")
-        else:
-            safety_factor = elastic_limit_inner / max_stress
-            print(f"*** ELASTIC BEHAVIOR ***")
-            print(f"Safety factor: {safety_factor:.2f}")
-
-    if 'Max Plastic Strain' in plasticity_data_inner:
-        max_plastic_strain = plasticity_data_inner['Max Plastic Strain']['maximum']
-        final_plastic_strain = plasticity_data_inner['Max Plastic Strain']['final']
-
-        if max_plastic_strain > 1e-8:
-            print(f"*** PLASTIC DEFORMATION CONFIRMED ***")
-            print(f"Maximum plastic strain: {max_plastic_strain:.2e}")
-            print(f"Final plastic strain: {final_plastic_strain:.2e}")
-
-            if max_plastic_strain > 1e-6:
-                print(f"*** SIGNIFICANT PLASTIC DEFORMATION ***")
-                print(f"This level of plastic strain may cause permanent changes")
-                print(f"to the sensor's mechanical properties and calibration")
-        else:
-            print(f"No significant plastic strain detected")
-
-    if 'Max Yield Function' in plasticity_data_inner:
-        max_yield_function = plasticity_data_inner['Max Yield Function']['maximum']
-        final_yield_function = plasticity_data_inner['Max Yield Function']['final']
-
-        print(f"Maximum yield function value: {max_yield_function:.6f}")
-        print(f"Final yield function value: {final_yield_function:.6f}")
-
-        if max_yield_function > 1e-6:
-            print(f"*** YIELD FUNCTION ACTIVE (f > 0) ***")
-            print(f"Material is actively yielding during simulation")
-        else:
-            print(f"Yield function remains inactive (f </= 0)")
-
-    # Stress state analysis
-    if all(key in plasticity_data_inner for key in
-           ['Max Principal Stress 1', 'Max Principal Stress 2', 'Max Principal Stress 3']):
-        print('\n--- STRESS STATE ANALYSIS (Inner Blade) ---')
-        sig1_max = plasticity_data_inner['Max Principal Stress 1']['maximum']
-        sig2_max = plasticity_data_inner['Max Principal Stress 2']['maximum']
-        sig3_max = plasticity_data_inner['Max Principal Stress 3']['maximum']
-
-        print(f"Maximum principal stresses:")
-        print(f"  Sigma1 = {sig1_max:.2f} MPa")
-        print(f"  Sigma2 = {sig2_max:.2f} MPa")
-        print(f"  Sigma3 = {sig3_max:.2f} MPa")
-
-        if abs(sig2_max) < 0.1 * abs(sig1_max) and abs(sig3_max) < 0.1 * abs(sig1_max):
-            print("Stress state: Predominantly uniaxial")
-        elif abs(sig3_max) < 0.1 * max(abs(sig1_max), abs(sig2_max)):
-            print("Stress state: Predominantly plane stress")
-        else:
-            print("Stress state: Triaxial")
-
-    if 'Max Triaxiality' in plasticity_data_inner:
-        max_triax = plasticity_data_inner['Max Triaxiality']['maximum']
-        print(f"Maximum stress triaxiality: {max_triax:.3f}")
-
-        if max_triax > 0.33:
-            print("High triaxiality - potential for void growth")
-        elif max_triax < -0.33:
-            print("Compressive triaxiality - shear-dominated deformation")
-        else:
-            print("Moderate triaxiality - balanced stress state")
-
-    # Correlation with temperature
-    print('\n--- PLASTICITY-TEMPERATURE CORRELATION (Inner Blade) ---')
-
-    if time_values and 'Max Von Mises Stress' in plasticity_data_inner:
-        try:
-            with open('Max_VonMises_inner.ascii', 'r') as f:
-                stress_values = [float(line.strip()) for line in f if line.strip()]
-
-            if len(stress_values) == len(time_values):
-                plastic_start_indices = [i for i, stress in enumerate(stress_values) if stress > elastic_limit_inner]
-
-                if plastic_start_indices:
-                    plastic_start_time = time_values[plastic_start_indices[0]]
-                    plastic_start_stress = stress_values[plastic_start_indices[0]]
-
-                    print(f"Plasticity initiated at:")
-                    print(f"  Time: {plastic_start_time:.2f} s")
-                    print(f"  Stress: {plastic_start_stress:.2f} MPa")
-
-                    if os.path.exists('temp_mean_blade_K.ascii'):
-                        with open('temp_mean_blade_K.ascii', 'r') as f:
-                            temp_values = [float(line.strip()) for line in f if line.strip()]
-
-                        if len(temp_values) == len(time_values):
-                            delta_T = temp_values[plastic_start_indices[0]]
-                            plastic_start_temp_C = delta_T - 273.15
-                            print(f"  Temperature at plasticity onset: {plastic_start_temp_C:.1f}°C")
-                            print(f"  Temperature rise from start: {plastic_start_temp_C - 10:.1f}°C")
-                else:
-                    print("No plasticity detected based on stress threshold")
-
-        except Exception as e:
-            print(f"Could not correlate plasticity with temperature: {e}")
-
-    # Plasticity impact summary
-    print('\n--- PLASTICITY IMPACT ON SENSOR (Inner Blade) ---')
-    if 'Max Plastic Strain' in plasticity_data_inner and plasticity_data_inner['Max Plastic Strain']['maximum'] > 1e-6:
-        print("*** WARNING: SIGNIFICANT PLASTICITY DETECTED ***")
-        print("Potential impacts on sensor performance:")
-        print(" Permanent deformation may alter resonant frequencies")
-        print(" Stress relaxation could affect long-term stability")
-        print(" Calibration may drift due to permanent material changes")
-        print(" Consider reducing temperature range or stress levels")
-        print(" Material substitution (higher yield strength) may be needed")
-    else:
-        print(" Plasticity levels are minimal - sensor should maintain calibration")
-        print(" Elastic behavior preserved - good for long-term stability")
+            print(" Plasticity levels are minimal - sensor should maintain calibration")
+            print(" Elastic behavior preserved - good for long-term stability")
 
     # ============================================================Displacement analysis - KEY for sensor performance ======================================
     disp_files = {

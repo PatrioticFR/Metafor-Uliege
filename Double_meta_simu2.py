@@ -41,15 +41,15 @@ class BladeConfig:
         # Current blade geometry
         self.thickness = 0.24  # current thickness (e/h)
         self.length = 105.25 # current length (L)
-        self.width = 25.0  # current width
+        self.width = 30.0  # current width
 
         # Material selection: 'BE_CU', 'INVAR', 'INVAR_CW_HARD'
         self.material = 'BE_CU'
 
         # --- Inner blade (Invar)
-        self.inner_thickness = 0.24
+        self.inner_thickness = 0.23
         self.inner_length = 102.0 # Calculated automatically after based on the outer blade length so useless here
-        self.inner_width = 25.0
+        self.inner_width = 20.0
 
         # Material selection: 'BE_CU', 'INVAR', 'INVAR_CW_HARD'
         self.inner_material = 'INVAR_CW_HARD'
@@ -769,7 +769,7 @@ def getMetafor(d={}):
         materials(1).put(YIELD_NUM, yield_num)
         # Note: No YIELD_NUM and TmElastHypoMaterial if elastic only: Use TmEvpIsoHHypoMaterial if plastic
 
-        #Inner blade (INVAR only)
+        #Inner blade
         materials.define(5, TmEvpIsoHHypoMaterial)
         if blade_config.inner_material == 'BE_CU':
             materials(5).put(MASS_DENSITY, 8.36e-9)
@@ -828,7 +828,7 @@ def getMetafor(d={}):
         elif blade_config.material == 'INVAR_CW_HARD':
             materials(1).put(MASS_DENSITY, 8.15e-9)
             materials(1).put(POISSON_RATIO, 0.29)
-            materials(1).put(ELASTIC_MODULUS, 141e3)
+            materials(1).put(ELASTIC_MODULUS, fctE.evaluate(283.15))
 
         materials(1).put(YIELD_NUM, yield_num)
 
@@ -845,7 +845,7 @@ def getMetafor(d={}):
         elif blade_config.inner_material == 'INVAR_CW_HARD':
             materials(5).put(MASS_DENSITY, 8.15e-9)
             materials(5).put(POISSON_RATIO, 0.29)
-            materials(5).put(ELASTIC_MODULUS, 141e3)
+            materials(5).put(ELASTIC_MODULUS, fctE.evaluate(283.15))
 
         materials(5).put(YIELD_NUM, inner_yield_num)
 
@@ -2952,8 +2952,8 @@ def additional_diagnostics(blade_config):
         'INVAR_CW_HARD': {'elastic_limit': 650.0, 'hardening': 700.0}
     }
 
-    # Use Invar properties for the inner blade
-    inner_material = 'INVAR'
+    # Determine current material (you'll need to pass this or detect it)
+    inner_material = blade_config.inner_material  # Change this based on your blade_config.inner_material
     elastic_limit_inner = material_properties_inner[inner_material]['elastic_limit']
 
     print(f"Material (Inner Blade): {inner_material}")
