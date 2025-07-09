@@ -10,6 +10,25 @@
 
 # -*- coding: utf-8 -*-
 
+# Invar Blade Parameters:
+#
+# In V4, specific parameters for the Invar blade have been introduced:
+# ei = 0.15: Thickness of the Invar blade.
+# Li = 103.25: Length of the Invar blade.
+# These parameters allow for more precise control over the geometry of the Invar blade, distinguishing it from the beryllium-copper blade.
+# Adjustments to Invar Blade Geometry:
+#
+# The coordinates for the points defining the Invar blade have been slightly adjusted to reflect the new parameters:
+# p33 and p34 have been updated to use the new length parameter Li and adjusted for the thickness ei.
+# Thickness of the Invar Blade:
+#
+# The thickness property for the Invar blade has been updated in the element properties:
+# prp5.put(THICKNESS, 20.0): This change reduces the thickness to decrease the rigidity of the Invar blade, which could be intended to fine-tune the mechanical properties of the sensor.
+# Comments and Documentation:
+#
+# Additional comments have been added to clarify the purpose of certain parameters and adjustments, such as the reduction in thickness to decrease rigidity.
+
+
 from wrap import *
 from wrap.mtFrequencyAnalysisw import *
 import math

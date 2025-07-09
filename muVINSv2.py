@@ -10,6 +10,28 @@
 
 # -*- coding: utf-8 -*-
 
+# Addition of a new Invar leaf spring:
+#
+# Version V2 introduces a new Invar leaf spring, defined by points p31 to p34. This spring is added alongside the existing beryllium-copper spring.
+# The curves and surfaces associated with this new spring are also defined (c30 to c34, w7, s7).
+# Definition of material properties for Invar:
+#
+# A new material is defined for Invar with its specific properties (density, elastic modulus, Poisson's ratio, etc.).
+# A new behavior law is also defined for Invar.
+# Application of properties to the Invar leaf spring:
+#
+# A new element property prp5 is created for the Invar leaf spring, and a field applicator app5 is used to apply this property to the surface of the Invar leaf spring (s7).
+# Modification of applied rotations:
+#
+# In version V2, the rotation is applied not only to the beryllium-copper leaf spring (c3), but also to the new Invar leaf spring (c32).
+# Addition of extra points and curves:
+#
+# Several new points (p35 to p38) and curves (c34) are added to define the geometry and mesh of the new Invar leaf spring.
+# Minor modifications and corrections:
+#
+# Some minor corrections and adjustments have been made, such as modifying the indices of points and curves to avoid conflicts with the newly added elements.
+
+
 from wrap import *
 from wrap.mtFrequencyAnalysisw import *
 import math

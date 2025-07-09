@@ -50,6 +50,16 @@ def getMetafor(d={}):
     y = D/2     # the mass is centered on the rod
     h = l-r-d
 
+
+
+    import math
+    T = 12.0        # final simulation time
+    T_load = 10.0   # loading time
+    Dx = -67.5227   # Param to set the reference horizontal location of the clamping pt (dist btw the 2 clamping pt)
+    Dx1 = 0.0       # set horizontal shift (>0: shift closer to hinge)
+    Dy = 0.0        # set vertical shift (>0: shift upward)
+    angleClamp = 0.0    # set angle (>0: anti-clockwise)
+
     # mesh
     ne = 8      # blade - elements through the thickness
     nL = int(L*20)  # blade - elements along the length
@@ -60,15 +70,6 @@ def getMetafor(d={}):
     n9 = 1    # rod horiz 2
     n14 = 3  # mass vertical 1
     n15 = 17  # mass vertical 2
-
-    import math
-    T = 12.0        # final simulation time
-    T_load = 10.0   # loading time
-    Dx = -67.5227   # Param to set the reference horizontal location of the clamping pt (dist btw the 2 clamping pt)
-    Dx1 = 0.0       # set horizontal shift (>0: shift closer to hinge)
-    Dy = 0.0        # set vertical shift (>0: shift upward)
-    angleClamp = 0.0    # set angle (>0: anti-clockwise)
-
 
     # Geometry
 

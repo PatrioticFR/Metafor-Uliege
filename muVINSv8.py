@@ -10,7 +10,15 @@
 
 # -*- coding: utf-8 -*-
 
-#0.07
+# Comments and Clarifications:
+#
+# Some comments have been slightly rephrased or clarified for better understanding. For example, the comment about the working directory in the postpro function has been clarified to indicate where the working directory is set.
+# File Handling in Post-processing:
+#
+# The post-processing function has been slightly adjusted to handle the reading of time values from time.ascii more robustly. It checks if the file exists and reads the time values to associate them with the Von Mises stress values. If the time values cannot be read or associated, it provides a warning but continues to display the maximum Von Mises stress values without the associated times.
+# Error Handling and Messages:
+#
+# Additional print statements have been added to provide more feedback during the execution of the post-processing function. These statements help in debugging by indicating whether files are found, read correctly, or if there are issues with the data.
 
 from wrap import *
 from wrap.mtFrequencyAnalysisw import *

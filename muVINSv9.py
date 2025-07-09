@@ -10,7 +10,24 @@
 
 # -*- coding: utf-8 -*-
 
-#0.07
+# Thread Configuration:
+#
+# In V9, the number of threads for Intel Threading Building Blocks (TBB) is explicitly set to 16 using the environment variable TBB_NUM_THREADS. This configuration aims to optimize the parallel processing capabilities of the simulation, likely to improve performance on a multi-core processor.
+# Thickness Adjustments:
+#
+# The thickness of the Beryllium-Copper (Be-Cu) blade has been increased:
+# e = 0.27: This is an increase from the previous value of 0.24, which will affect the blade's mechanical properties and stiffness.
+# The thickness of the Invar blade has also been increased:
+# ei = 0.25: This is an increase from the previous value of 0.07, significantly changing the blade's flexibility and interaction characteristics.
+# Thickness Properties for Blades:
+#
+# The thickness properties for both the Be-Cu and Invar blades have been updated:
+# Be-Cu blade thickness: prp1.put(THICKNESS, 20.5)
+# Invar blade thickness: prp5.put(THICKNESS, 27.0)
+# These changes are likely intended to adjust the stiffness and mechanical behavior of the blades in the simulation.
+# Comments and Documentation:
+#
+# Additional comments and clarifications have been added to explain the purpose of certain parameters and adjustments, such as the thread configuration and thickness settings.
 
 from wrap import *
 from wrap.mtFrequencyAnalysisw import *

@@ -10,6 +10,38 @@
 
 # -*- coding: utf-8 -*-
 
+# Invar Blade Thickness and Geometry Adjustments:
+#
+# The thickness of the Invar blade has been reduced significantly:
+# ei = 0.05: This is a reduction from the previous value of 0.15, which will likely affect the blade's flexibility and mechanical properties.
+# The length of the Invar blade is now calculated based on a ratio of the radii of the Invar and Beryllium-Copper (Be-Cu) blades:
+# Li = L * ratio: This ensures that the Invar blade length is proportional to its radius, maintaining a consistent bending angle with the Be-Cu blade.
+
+# Positioning and Relative Displacement:
+#
+# A horizontal offset (decalage) between the blades has been introduced:
+# decalage = 0.1: This offset ensures that the blades are not perfectly aligned, which can be important for simulating real-world conditions or specific design requirements.
+# The inner radius for the Be-Cu blade and the median radius for the Invar blade are calculated to ensure proper positioning:
+# rayon_interne_BeCu = enc / 2
+# R_beCu = rayon_interne_BeCu + e / 2
+# R_invar = rayon_interne_BeCu - decalage - ei / 2
+# The ratio of the radii is used to adjust the length of the Invar blade.
+# Adjustments to Rotation Axes and Displacements:
+#
+# Separate rotation axes and displacement functions have been defined for the Invar blade:
+# axe1_Invar and axe2_Invar are defined for the Invar blade, similar to those for the Be-Cu blade.
+# New points pa3i and pa4i are defined for the Invar blade's rotation axis, ensuring consistent spacing and alignment.
+# A separate piecewise linear function fctX_invar is used for the displacement of the Invar blade, allowing for independent control over its movement.
+# Rotation and Displacement Functions for Invar Blade:
+#
+# The Invar blade has its own rotation functions (fctR_invar and fctR2_invar), which are similar to those of the Be-Cu blade but can be adjusted independently.
+# The displacement function for the Invar blade (fctX_invar) uses a modified parameter Dx_invar, which is adjusted by the ratio of the radii to ensure proper positioning relative to the Be-Cu blade.
+# Application of Rotation and Displacement:
+#
+# The rotation and displacement are applied separately to the Be-Cu and Invar blades, allowing for independent control over each blade's behavior during the simulation.
+
+
+
 from wrap import *
 from wrap.mtFrequencyAnalysisw import *
 import math

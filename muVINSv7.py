@@ -10,7 +10,34 @@
 
 # -*- coding: utf-8 -*-
 
-#0.07
+# Invar Blade Thickness Adjustment:
+#
+# The thickness of the Invar blade has been slightly increased:
+# ei = 0.07: This is an increase from the previous value of 0.05, which will affect the blade's mechanical properties and flexibility.
+# Material Properties for Invar:
+#
+# The material properties for Invar have been updated to reflect more accurate or specific values:
+# Elastic Modulus: 143e3 MPa (previously 140e3).
+# Poisson's Ratio: 0.26 (previously 0.294).
+# Yield Limit: 276.0 MPa (previously 350.0).
+# Hardening Modulus: 800.0 (previously 1000.0).
+# These changes are likely based on more precise material data or specific experimental requirements.
+# Additional Data Extraction in Post-processing:
+#
+# The post-processing function has been enhanced to read and display the maximum Von Mises stress values for both the Be-Cu and Invar blades:
+# A new function read_max_stress has been introduced to read the ASCII files and extract the maximum stress values and their corresponding times.
+# The postpro function now includes logic to read these values from the ASCII files and print them out, providing more detailed output for analysis.
+# Additional History Curves for Displacement:
+#
+# Additional history curves have been added to track the vertical displacements of specific points on the mass:
+# hcurves.add(10, ...): Tracks the vertical displacement of the bottom left mass corner.
+# hcurves.add(11, ...): Tracks the vertical displacement of the bottom right mass corner.
+# hcurves.add(12, ...): Tracks the vertical displacement of the top right mass corner.
+# hcurves.add(13, ...): Tracks the vertical displacement of the top left mass corner.
+# These additions allow for a more comprehensive analysis of the mass's movement during the simulation.
+# Plotting Enhancements:
+#
+# The plotting section has been updated to include the new displacement curves, providing a visual representation of the vertical displacements of the mass corners over time.
 
 from wrap import *
 from wrap.mtFrequencyAnalysisw import *

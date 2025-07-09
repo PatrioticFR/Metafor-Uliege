@@ -10,6 +10,36 @@
 
 # -*- coding: utf-8 -*-
 
+
+# Invar Blade Length Adjustment:
+#
+# The length of the Invar blade has been slightly adjusted in V5:
+# Li = 104.4: This is a minor change from the previous version, which had Li = 103.25. This adjustment might be aimed at fine-tuning the mechanical properties or fitting specific design requirements.
+# Rotation Axes for Blades:
+#
+# Separate rotation axes have been defined for the Beryllium-Copper (Be-Cu) blade and the Invar blade:
+# axe1_BeCu is defined for the Be-Cu blade using points pa1 and pa2.
+# axe1_Invar is defined for the Invar blade using new points pa5 and pa6.
+# This separation allows for independent control over the rotation of each blade, which can be crucial for simulating the dynamics and interactions of the two blades accurately.
+# New Points for Invar Blade Rotation:
+#
+# New points pa5 and pa6 have been introduced to define the rotation axis for the Invar blade:
+# pa5 = pointset.define(41, enc - ei / 2 - 0.1, Li / 2)
+# pa6 = pointset.define(42, enc - ei / 2 - 0.1, Li / 2, 1.0)
+# These points are used to create the axis axe1_Invar, which is specific to the Invar blade.
+
+# Application of Rotation to Both Blades:
+#
+# The rotation is applied to both the Be-Cu blade and the Invar blade using their respective axes:
+# For the Be-Cu blade:
+#
+# domain.getLoadingSet().defineRot2(c3, Field3D(TXTYTZ, RE), axe2, angleClamp, fctR2, axe1_BeCu, 180, fctR, False)
+# For the Invar blade:
+#
+# domain.getLoadingSet().defineRot2(c32, Field3D(TXTYTZ, RE), axe2, angleClamp, fctR2, axe1_Invar, 180, fctR, False)
+# These changes primarily focus on refining the simulation by allowing independent control over the rotation of each blade, which can be essential for accurately modeling the behavior of the sensor, especially when dealing with complex dynamics and interactions between components.
+
+
 from wrap import *
 from wrap.mtFrequencyAnalysisw import *
 import math

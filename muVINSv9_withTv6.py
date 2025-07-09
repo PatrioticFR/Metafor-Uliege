@@ -39,17 +39,17 @@ class BladeConfig:
         self.width_ref = 45.0  # reference width
 
         # Current blade geometry
-        self.thickness = 0.24  # current thickness (e/h)
+        self.thickness = 0.2  # current thickness (e/h)
         self.length = 105.25 # current length (L)
-        self.width = 28.0  # current width
+        self.width = 20.0  # current width
 
         # Material selection: 'BE_CU', 'INVAR', 'INVAR_CW_HARD'
         self.material = 'BE_CU'
 
-        # --- Inner blade (Invar)
-        self.inner_thickness = 0.2
+        # --- Inner blade
+        self.inner_thickness = 0.24
         self.inner_length = 102.0 # Calculated automatically after based on the outer blade length so useless here
-        self.inner_width = 45.0
+        self.inner_width = 36.5
 
         # Material selection: 'BE_CU', 'INVAR', 'INVAR_CW_HARD'
         self.inner_material = 'INVAR_CW_HARD'
@@ -244,7 +244,7 @@ class SimulationConfig:
         self.stabilization_time = 12.0
 
         # Temperature parameters
-        self.enable_thermal = False
+        self.enable_thermal = True
         self.temp_initial_kelvin = 273.15 + 10.0
         self.temp_final_kelvin = 273.15 + 50.0
         self.temp_start_time = 20.0
