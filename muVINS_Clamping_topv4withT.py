@@ -39,9 +39,9 @@ class BladeConfig:
         self.width_ref = 45.0  # reference width
 
         # Current blade geometry
-        self.thickness = 0.28  # current thickness (e/h)
+        self.thickness = 0.24  # current thickness (e/h)
         self.length = 105.25 # current length (L)
-        self.width = 50.0 # current width
+        self.width = 45.0 # current width
 
         # Material selection: 'BE_CU', 'INVAR', 'INVAR_CW_HARD'
         self.material = 'BE_CU'
@@ -53,7 +53,7 @@ class BladeConfig:
         # Reference equilibrium parameters
         self.enc_ref = 57.32
 
-        self.Dx_fixe = False  #Set to True for Dx = -67.5227 or -2 * R - 0.52 (experimental value) and False for Dx to be calculated
+        self.Dx_fixe = True  #Set to True for Dx = -67.5227 or -2 * R - 0.52 (experimental value) and False for Dx to be calculated
 
     def get_elements_length(self):
         return int(self.length * self.elements_length_factor)
@@ -206,7 +206,7 @@ class SimulationConfig:
         self.stabilization_time = 12.0
 
         # Temperature parameters
-        self.enable_thermal = True
+        self.enable_thermal = False
         self.temp_initial_kelvin = 273.15 + 10.0
         self.temp_final_kelvin = 273.15 + 50.0
         self.temp_start_time = 20.0
@@ -223,8 +223,6 @@ class SimulationConfig:
         # Fixed time step parameters (used when adaptive_timestep = False)
         self.fixed_timestep_size = 0.005  # Fixed time step size
         self.fixed_initial_timestep = 0.01  # Initial time step for fixed mode
-
-        self.ToporBottom = True # Set to True for bottom clamp, False for top clamp
 
         # Optimized clamping parameters
         self.Dx, self.Dy = blade_config.get_compensated_clamping_position()
@@ -822,15 +820,9 @@ def getMetafor(d={}):
     axe1 = Axe(pa1, pa1)
     axe1.setSymZ1(1.0)
 
-    if sim_config.ToporBottom:
-        pa3 = pointset.define(31, Dx1 + enc, Dy, 0.0)
-        pa4 = pointset.define(32, Dx1 + enc, Dy, 1.0)
-        axe2 = Axe(pa3, pa4)
-    else:
-        pa3 = pointset.define(31, Dx1 + enc, -Dy, 0.0)
-        pa4 = pointset.define(32, Dx1 + enc, -Dy, 1.0)
-        axe2 = Axe(pa3, pa4)
-
+    pa3 = pointset.define(31, Dx1 + enc, Dy, 0.0)
+    pa4 = pointset.define(32, Dx1 + enc, Dy, 1.0)
+    axe2 = Axe(pa3, pa4)
 
     # OPTIMIZED LOADING FUNCTIONS - Smoother and faster convergence
     fctX = PieceWiseLinearFunction()
@@ -851,14 +843,8 @@ def getMetafor(d={}):
 
     domain.getLoadingSet().define(pa1, Field1D(TX, RE), 0.0, fctX)
     domain.getLoadingSet().define(pa2, Field1D(TX, RE), 0.0, fctX)
-
-    if sim_config.ToporBottom:
-        domain.getLoadingSet().define(pa1, Field1D(TY, RE), Dy, fctY)
-        domain.getLoadingSet().define(pa2, Field1D(TY, RE), Dy, fctY)
-
-    else:
-        domain.getLoadingSet().define(pa1, Field1D(TY, RE), -Dy, fctY)
-        domain.getLoadingSet().define(pa2, Field1D(TY, RE), -Dy, fctY)
+    domain.getLoadingSet().define(pa1, Field1D(TY, RE), Dy, fctY)
+    domain.getLoadingSet().define(pa2, Field1D(TY, RE), Dy, fctY)
 
     # OPTIMIZED ROTATION FUNCTIONS - Much smoother for better convergence
     fctR = PieceWiseLinearFunction()
@@ -877,11 +863,7 @@ def getMetafor(d={}):
     fctR2.setData(T_load, 1.0)
     fctR2.setData(T, 1.0)
 
-    if sim_config.ToporBottom:
-        domain.getLoadingSet().defineRot2(c1, Field3D(TXTYTZ, RE), axe2, angleClamp, fctR2, axe1, - 180, fctR, False)
-    else:
-        domain.getLoadingSet().defineRot2(c1, Field3D(TXTYTZ, RE), axe2, angleClamp, fctR2, axe1,  180, fctR, False)
-
+    domain.getLoadingSet().defineRot2(c1, Field3D(TXTYTZ, RE), axe2, angleClamp, fctR2, axe1, - 180, fctR, False)
 
     # OPTIMIZED THERMAL LOADING
     if sim_config.enable_thermal:
@@ -922,11 +904,7 @@ def getMetafor(d={}):
     fctSol.setData(4.0, 1.0)  # Ground moves down between 3s and 4s
     fctSol.setData(T, 1.0)  # Ground remains down for the rest of the simulation
 
-    if sim_config.ToporBottom:
-        DSol = -20  # Downward displacement in mm (put to 20mm to avoid contact with the mass)
-    else:
-        DSol = -10  # Downward displacement in mm
-
+    DSol = -10  # Downward displacement in mm
     domain.getLoadingSet().define(c26, Field1D(TY, RE), DSol, fctSol)
 
     # Contact
@@ -1023,12 +1001,12 @@ def getMetafor(d={}):
     # TOLERANCE MANAGEMENT - ADAPTIVE for different phases
     fct_TOL = PieceWiseLinearFunction()
     fct_TOL.setData(0.0, 1.0)  # Standard tolerance for mechanical
-    fct_TOL.setData(sim_config.loading_time * 0.75, 1.0)  # Tighter end of loading
-    fct_TOL.setData(sim_config.loading_time, 1.0)  # Strict for transition
-    fct_TOL.setData(sim_config.loading_time + 1.0, 0.1)  # Tres strict stabilisation
-    fct_TOL.setData(sim_config.loading_time + 2.5, 0.1)  # Maximum stricte 7.5-12s
-    fct_TOL.setData(sim_config.temp_start_time - 1.0, 0.1)  # Relachement progressif
-    fct_TOL.setData(sim_config.temp_start_time, 0.1)  # Standard pour thermal
+    fct_TOL.setData(sim_config.loading_time * 0.75, 0.05)  # Tighter end of loading
+    fct_TOL.setData(sim_config.loading_time, 0.03)  # Strict for transition
+    fct_TOL.setData(sim_config.loading_time + 1.0, 0.01)  # Tres strict stabilisation
+    fct_TOL.setData(sim_config.loading_time + 2.5, 0.005)  # Maximum stricte 7.5-12s
+    fct_TOL.setData(sim_config.temp_start_time - 1.0, 0.01)  # Relachement progressif
+    fct_TOL.setData(sim_config.temp_start_time, 0.01)  # Standard pour thermal
 
     if sim_config.enable_thermal:
         # Stricter tolerance during thermal phase due to large temperature gradients
@@ -1053,11 +1031,61 @@ def getMetafor(d={}):
     fct_MaxIter.setData(sim_config.temp_end_time, 40.0) # Max pendant thermal
     fct_MaxIter.setData(sim_config.final_time, 25.0)  # Standard until the end
 
+    # Apply adaptive iteration control
+    try:
+        mim.setMaxNbOfIterations(40, fct_MaxIter)  # Adaptive function
+        print("Adaptive iteration control set successfully")
+    except (AttributeError, TypeError):
+        print("Using fixed iteration control")
+        mim.setMaxNbOfIterations(40)  # Fallback fixe plus eleve
 
-    print("Using fixed iteration control")
-    mim.setMaxNbOfIterations(20)  # Fallback fixe plus eleve
-    mim.setResidualTolerance(1e-4, fct_TOL)
+    mim.setResidualTolerance(5e-5, fct_TOL)
     mim.setPredictorComputationMethod(EXTRAPOLATION_MRUA)  # Better prediction
+
+    # Line search method - with compatibility management for different versions
+    try:
+        mim.setLineSearchMethod(LINESEARCH_ARMIJO)  # Robust line search
+        print("Line search method set successfully")
+    except AttributeError:
+        print("Line search method not available in this Metafor version - using default")
+        # Alternative: try other possible names
+        try:
+            mim.setLineSearch(LINESEARCH_ARMIJO)
+        except AttributeError:
+            try:
+                # Other possibilities depending on version
+                mim.enableLineSearch(True)
+            except AttributeError:
+                print("No line search method available - continuing with default settings")
+
+    # Alternative methods for load increment control
+    try:
+        # Try to set load increment parameters if available in your Metafor version
+        mim.setMaxNbOfLoadIncrements(50)  # Alternative method name
+        print("Load increment control set successfully")
+    except AttributeError:
+        # If not available, rely on time step control and iteration limits
+        print("Using time step control for load increment management")
+        try:
+            # Essayer d'autres methodes possibles
+            mim.setMaxNumberOfLoadIncrements(50)
+        except AttributeError:
+            print("No load increment control available - using time step control only")
+
+    # Auto-remeshing parameters for large deformation (if needed)
+    try:
+        mim.setAutoRemeshingParameters(0.8, 0.2, 2)  # Quality thresholds
+        print("Auto-remeshing parameters set successfully")
+    except AttributeError:
+        print("Auto-remeshing not available in this version")
+
+    # Additional stability settings pour ameliorer la convergence
+    try:
+        # More robust convergence parameters
+        mim.setResidualComputationMethod(Method4ResidualComputation())
+    except AttributeError:
+        print("Residual computation method not available - using default")
+
 
 
     # History curves (Save data in .txt files) - OPTIMIZED for thermal analysis
@@ -1205,11 +1233,11 @@ def getMetafor(d={}):
             extractor_count += 1
 
             # --- Blade tip temperature and displacement ---
-            hcurves.add(42, DbNodalValueExtractor(p2, Field1D(TO, RE)), SumOperator(), 'temp_blade_tip_K');
+            hcurves.add(42, DbNodalValueExtractor(p3, Field1D(TO, RE)), SumOperator(), 'temp_blade_tip_K');
             extractor_count += 1
-            hcurves.add(43, DbNodalValueExtractor(p2, Field1D(TX, RE)), SumOperator(), 'dispX_blade_tip');
+            hcurves.add(43, DbNodalValueExtractor(p3, Field1D(TX, RE)), SumOperator(), 'dispX_blade_tip');
             extractor_count += 1
-            hcurves.add(44, DbNodalValueExtractor(p2, Field1D(TY, RE)), SumOperator(), 'dispY_blade_tip');
+            hcurves.add(44, DbNodalValueExtractor(p3, Field1D(TY, RE)), SumOperator(), 'dispY_blade_tip');
             extractor_count += 1
 
         # === Final check: verify all extractors that were added ===

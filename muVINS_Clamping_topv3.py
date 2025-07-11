@@ -55,7 +55,7 @@ def getMetafor(d={}):
     T_load = 10.0   # loading time
     Dx = -67.5227   # Param to set the reference horizontal location of the clamping pt (dist btw the 2 clamping pt)
     Dx1 = 0.0       # set horizontal shift (>0: shift closer to hinge)
-    Dy = -67.0        # set vertical shift (>0: shift upward)
+    Dy = -0.0       # set vertical shift (>0: shift upward)
     angleClamp = 0.0    # set angle (>0: anti-clockwise)
 
 
@@ -378,25 +378,18 @@ def getMetafor(d={}):
 
     #-----------------Modification from this point---------------------------:
 
-    # Prescribed displacements
-    # bottom: clamped
-    domain.getLoadingSet().define(p17, Field1D(TX, RE), 0.0)  # hinge clamped
-    domain.getLoadingSet().define(p17, Field1D(TY, RE), 0.0)  # hinge clamped
-    domain.getLoadingSet().define(c26, Field1D(TX, RE), 0.0)  # ground first fixed
-    domain.getLoadingSet().define(c26, Field1D(TY, RE), 0.0)  # ground first fixed
-    domain.getLoadingSet().define(p30, Field1D(TY, RE), 0.0)  # hinge spring end fixed
-    domain.getLoadingSet().define(p30, Field1D(TX, RE), 0.0)  # hinge spring end fixed
+    Radius = L / math.pi
+    Dy = -Radius *2
 
-    # Axe de rotation pour courbure - CORRECTION ICI
-    # L'axe doit être défini avec deux points distincts
-    pa1 = pointset.define(23, enc + e / 2, L / 2)  # Position corrigée
-    pa2 = pointset.define(24, enc + e / 2, L / 2, 1.0)  # Deuxième point pour définir l'axe
-    axe1 = Axe(pa1, pa2)  # CORRECTION : utiliser pa2 au lieu de pa1
+    # Axe de rotation pour courbure
+    pa1 = pointset.define(23, enc + L / 2, 0.0)
+    pa2 = pointset.define(24, enc + L / 2, 0.0, 1.0)
+    axe1 = Axe(pa1, pa1)
     axe1.setSymZ1(1.0)
 
-    # Point de clamp - pour la deuxième rotation
-    pa3 = pointset.define(31, Dx1 + enc + e / 2, Dy, 0.0)  # Position corrigée
-    pa4 = pointset.define(32, Dx1 + enc + e / 2, Dy, 1.0)
+    # Point de clamp
+    pa3 = pointset.define(31, Dx1 + enc, Dy, 0.0)
+    pa4 = pointset.define(32, Dx1 + enc, Dy, 1.0)
     axe2 = Axe(pa3, pa4)
 
     # axis displacement
@@ -407,7 +400,7 @@ def getMetafor(d={}):
     fctX = PieceWiseLinearFunction()
     fctX.setData(0.0, 0.0)
     fctX.setData(T_load / 8, 0.0)
-    fctX.setData(T_load / 2, Dx / (Dx + Dx1))  # CORRECTION : ratio proper
+    fctX.setData(T_load / 2, 1.0)
     fctX.setData(3 * T_load / 4, 1.0)
     fctX.setData(T_load, 1.0)
     fctX.setData(T, 1.0)
@@ -420,8 +413,8 @@ def getMetafor(d={}):
     fctY.setData(T, 1.0)
 
     # Appliquer les déplacements sur les deux axes
-    domain.getLoadingSet().define(pa1, Field1D(TX, RE), (Dx + Dx1), fctX)
-    domain.getLoadingSet().define(pa2, Field1D(TX, RE), (Dx + Dx1), fctX)
+    domain.getLoadingSet().define(pa1, Field1D(TX, RE), 0.0, fctX)
+    domain.getLoadingSet().define(pa2, Field1D(TX, RE), 0.0, fctX)
     domain.getLoadingSet().define(pa1, Field1D(TY, RE), Dy, fctY)
     domain.getLoadingSet().define(pa2, Field1D(TY, RE), Dy, fctY)
 
@@ -442,9 +435,7 @@ def getMetafor(d={}):
     fctR2.setData(T_load, 1.0)
     fctR2.setData(T, 1.0)
 
-    # CORRECTION : Utiliser l'angle de 180° pour faire un demi-cercle parfait
-    # et s'assurer que l'orientation est correcte
-    domain.getLoadingSet().defineRot2(c1, Field3D(TXTYTZ, RE), axe2, angleClamp, fctR2, axe1, 180, fctR, False)
+    domain.getLoadingSet().defineRot2(c1, Field3D(TXTYTZ, RE), axe2, angleClamp, fctR2, axe1, - 180, fctR, False)
 
     #------------------------------------------UP TO THIS POINT-------------------------------------------
 

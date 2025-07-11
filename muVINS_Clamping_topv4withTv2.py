@@ -39,7 +39,7 @@ class BladeConfig:
         self.width_ref = 45.0  # reference width
 
         # Current blade geometry
-        self.thickness = 0.28  # current thickness (e/h)
+        self.thickness = 0.26  # current thickness (e/h)
         self.length = 105.25 # current length (L)
         self.width = 50.0 # current width
 
